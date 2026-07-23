@@ -287,10 +287,14 @@ final class OnboardingUITests: XCTestCase {
         waitTap("single.start")
         let statement = element("consent.statement")
         XCTAssertTrue(statement.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            statement.label,
+            "我叫 Alice，我已经成年，我同意并自愿与 Bob 发生性关系，我意识清醒，没有受到任何形式的胁迫。"
+        )
         let windowFrame = app.windows.firstMatch.frame
         XCTAssertGreaterThanOrEqual(statement.frame.minX, windowFrame.minX)
         XCTAssertLessThanOrEqual(statement.frame.maxX, windowFrame.maxX)
-        XCTAssertGreaterThan(statement.frame.height, 80, "the statement should expand vertically instead of clipping")
+        XCTAssertGreaterThan(statement.frame.height, 60, "the statement should expand vertically instead of clipping")
     }
 
     func testVaultPasswordCanBeFilledWithOneTap() throws {

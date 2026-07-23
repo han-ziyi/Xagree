@@ -560,7 +560,7 @@ private struct DualConsentView: View {
                 .font(.title2.bold())
             Text("请由 \(model.localName) 本人读完并准备录制。对方也准备好后，两台设备会一起开始 3 秒倒计时。")
                 .foregroundStyle(.secondary)
-            Text("我是 \(model.localName)。我已经成年，也愿意在此刻与 \(model.remoteName) 亲密相处。我知道自己可以在录制前停下来，或者重新确认后再继续。")
+            Text(ConsentStatement.text(participantName: model.localName, otherParticipantName: model.remoteName))
                 .font(.body)
                 .padding()
                 .background(AppTheme.accentSoft, in: RoundedRectangle(cornerRadius: 8))

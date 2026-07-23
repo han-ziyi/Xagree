@@ -121,14 +121,32 @@ private struct EvidencePlayerView: View {
     @State private var player: AVPlayer?
     @State private var idleTimer: Timer?
     @State private var isObscured = false
+    @State private var isFullScreenPresented = false
 
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
                 if let player {
-                    VideoPlayer(player: player)
-                        .aspectRatio(9 / 16, contentMode: .fit)
-                        .onTapGesture { resetIdleTimer() }
+                    ZStack(alignment: .topTrailing) {
+                        VideoPlayer(player: player)
+                            .onTapGesture { resetIdleTimer() }
+                        Button {
+                            resetIdleTimer()
+                            isFullScreenPresented = true
+                        } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(.black.opacity(0.68), in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("全屏播放")
+                        .accessibilityIdentifier(AccessibilityID.playerFullScreen)
+                        .help("全屏播放")
+                        .padding(12)
+                    }
+                    .aspectRatio(9 / 16, contentMode: .fit)
                 }
                 List {
                     Section("记录信息") {
@@ -150,7 +168,16 @@ private struct EvidencePlayerView: View {
             }
         }
         .navigationTitle("加密记录")
+        .fullScreenCover(isPresented: $isFullScreenPresented, onDismiss: resetIdleTimer) {
+            if let player {
+                FullScreenEvidencePlayer(player: player, onInteraction: resetIdleTimer)
+            }
+        }
         .onAppear {
+            guard player == nil else {
+                resetIdleTimer()
+                return
+            }
             let avPlayer = AVPlayer(url: evidence.videoURL)
             player = avPlayer
             avPlayer.play()
@@ -164,6 +191,7 @@ private struct EvidencePlayerView: View {
             }
         }
         .onDisappear {
+            guard !isFullScreenPresented else { return }
             idleTimer?.invalidate()
             removeTemporaryVideo()
         }
@@ -176,6 +204,10 @@ private struct EvidencePlayerView: View {
 
     private func resetIdleTimer() {
         idleTimer?.invalidate()
+        guard player != nil else {
+            idleTimer = nil
+            return
+        }
         idleTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { _ in
             Task { @MainActor in
                 removeTemporaryVideo()
@@ -187,8 +219,45 @@ private struct EvidencePlayerView: View {
     private func removeTemporaryVideo() {
         idleTimer?.invalidate()
         idleTimer = nil
+        isFullScreenPresented = false
         player?.pause()
         player = nil
         EvidenceCryptor.remove(evidence.videoURL)
+    }
+}
+
+private struct FullScreenEvidencePlayer: View {
+    let player: AVPlayer
+    let onInteraction: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            VideoPlayer(player: player)
+                .ignoresSafeArea()
+                .onTapGesture { onInteraction() }
+            Button {
+                onInteraction()
+                dismiss()
+            } label: {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.black.opacity(0.68), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("退出全屏")
+            .accessibilityIdentifier(AccessibilityID.playerExitFullScreen)
+            .help("退出全屏")
+            .padding(16)
+        }
+        .onAppear {
+            player.play()
+            onInteraction()
+        }
+        .onDisappear { onInteraction() }
     }
 }

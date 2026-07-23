@@ -94,6 +94,8 @@ enum AccessibilityID {
     static let consentAccept = "consent.accept"
     static let consentStart = "consent.start"
     static let recordingWatermark = "recording.watermark"
+    static let playerFullScreen = "player.fullScreen"
+    static let playerExitFullScreen = "player.exitFullScreen"
     static let encryptionVault = "encryption.method.vault"
     static let encryptionOneTime = "encryption.method.oneTime"
     static let encryptionAutofillVault = "encryption.autofillVault"

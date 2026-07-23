@@ -413,7 +413,7 @@ private struct ConsentView: View {
                         .font(.title3.weight(.bold))
                         .foregroundStyle(AppTheme.accent)
                         .accessibilityHidden(true)
-                    Text("我是 \(participantName)。我已经成年，也愿意在此刻与 \(otherName) 亲密相处。我知道自己可以在录制前停下来，或者重新确认后再继续。")
+                    Text(ConsentStatement.text(participantName: participantName, otherParticipantName: otherName))
                         .font(.title3)
                         .fixedSize(horizontal: false, vertical: true)
                 }

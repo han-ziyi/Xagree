@@ -55,6 +55,7 @@ enum MediaProcessor {
         )
         var cursor = CMTime.zero
         for url in urls {
+            // Each source frame already contains its burned-in timestamp watermark.
             try await validateSegment(url: url, expectedSHA256: nil)
             let asset = AVURLAsset(url: url)
             let videoTracks = try await asset.loadTracks(withMediaType: .video)

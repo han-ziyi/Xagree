@@ -1,5 +1,14 @@
 import Foundation
 
+enum ConsentStatement {
+    // Product-approved fixed wording. Only the two participant names may be substituted.
+    static let format = "我叫 %@，我已经成年，我同意并自愿与 %@ 发生性关系，我意识清醒，没有受到任何形式的胁迫。"
+
+    static func text(participantName: String, otherParticipantName: String) -> String {
+        L10n.format(format, participantName, otherParticipantName)
+    }
+}
+
 enum PasswordPolicy {
     enum ValidationIssue: Equatable {
         case tooShort

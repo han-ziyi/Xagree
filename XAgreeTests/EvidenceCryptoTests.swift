@@ -3,6 +3,13 @@ import XCTest
 
 @MainActor
 final class EvidenceCryptoTests: XCTestCase {
+    func testConsentStatementWordingIsFixed() {
+        XCTAssertEqual(
+            ConsentStatement.format,
+            "我叫 %@，我已经成年，我同意并自愿与 %@ 发生性关系，我意识清醒，没有受到任何形式的胁迫。"
+        )
+    }
+
     func testRecordingWatermarkUsesCurrentTimeAndStableTwoLineLayout() {
         let recordedAt = Date(timeIntervalSince1970: 1_700_000_000)
         let watermark = RecordingWatermark(

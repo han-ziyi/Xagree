@@ -88,6 +88,9 @@
         }
       }
     },
+    "一键填入总密码" : {
+
+    },
     "不需要登录，也不会上传给开发者。双机模式只在附近设备之间直接传输；导出位置由你们自己选择。" : {
       "localizations" : {
         "en" : {
@@ -491,6 +494,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "すべて削除"
+          }
+        }
+      }
+    },
+    "全屏播放" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play full screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フルスクリーンで再生"
           }
         }
       }
@@ -990,6 +1009,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1台のスマートフォン"
+          }
+        }
+      }
+    },
+    "同意爱帮助你们当面表达、彼此确认，再把共同的记录留在自己选择的地方。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A gentle way to express yourselves, confirm together, and keep a shared record where you choose."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ふたりで気持ちを伝え、確認し合い、選んだ場所に記録を残すためのアプリです。"
           }
         }
       }
@@ -1654,6 +1689,9 @@
         }
       }
     },
+    "总密码已填入" : {
+
+    },
     "我了解这是只留在我们手里的私密记录。" : {
       "localizations" : {
         "en" : {
@@ -1702,18 +1740,18 @@
         }
       }
     },
-    "我是 %@。我已经成年，也愿意在此刻与 %@ 亲密相处。我知道自己可以在录制前停下来，或者重新确认后再继续。" : {
+    "我叫 %@，我已经成年，我同意并自愿与 %@ 发生性关系，我意识清醒，没有受到任何形式的胁迫。" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "I am %@. I am an adult, and I choose to be intimate with %@ at this moment. I know I can pause before recording or continue after checking in again."
+            "value" : "My name is %@. I am an adult. I consent and willingly agree to have sex with %@. I am clear-minded and have not been subjected to any form of coercion."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "私は%@です。私は成人で、今この瞬間、%@と親密な時間を過ごすことを望んでいます。録画前に立ち止まったり、もう一度確認してから続けたりできると理解しています。"
+            "value" : "私の名前は%@です。私は成人です。私は%@と性行為をすることに同意し、自ら望んでいます。私は意識が清明で、いかなる形の強要も受けていません。"
           }
         }
       }
@@ -2042,9 +2080,6 @@
           }
         }
       }
-    },
-    "方式" : {
-
     },
     "无法使用本地网络。请允许本地网络权限并保持两台设备靠近。" : {
       "extractionState" : "stale",
@@ -3217,22 +3252,6 @@
         }
       }
     },
-    "同意爱帮助你们当面表达、彼此确认，再把共同的记录留在自己选择的地方。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A gentle way to express yourselves, confirm together, and keep a shared record where you choose."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ふたりで気持ちを伝え、確認し合い、選んだ場所に記録を残すためのアプリです。"
-          }
-        }
-      }
-    },
     "知道了" : {
       "localizations" : {
         "en" : {
@@ -4031,6 +4050,25 @@
           }
         }
       }
+    },
+    "退出全屏" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exit full screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フルスクリーンを終了"
+          }
+        }
+      }
+    },
+    "返回首页" : {
+
     },
     "这不是有效的私密记录文件。" : {
       "extractionState" : "stale",
