@@ -1,4 +1,5 @@
 import XCTest
+import CoreVideo
 @testable import XAgree
 
 @MainActor
@@ -26,6 +27,40 @@ final class EvidenceCryptoTests: XCTestCase {
         XCTAssertEqual(first.split(separator: "\n").count, 2)
         XCTAssertTrue(first.contains("12345678"))
         XCTAssertTrue(first.contains("REC"))
+    }
+
+    func testWatermarkRendererBurnsVisibleTextIntoFrame() throws {
+        let width = 320
+        let height = 568
+        var source: CVPixelBuffer?
+        let attributes = [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary
+        XCTAssertEqual(
+            CVPixelBufferCreate(
+                kCFAllocatorDefault,
+                width,
+                height,
+                kCVPixelFormatType_32BGRA,
+                attributes,
+                &source
+            ),
+            kCVReturnSuccess
+        )
+        let sourceBuffer = try XCTUnwrap(source)
+        fill(pixelBuffer: sourceBuffer, red: 128, green: 128, blue: 128)
+
+        let rendered = try XCTUnwrap(
+            WatermarkRenderer.shared.render(
+                pixelBuffer: sourceBuffer,
+                text: "2026-07-23 21:53:00\nREC · A · ABCD1234",
+                targetSize: CGSize(width: width, height: height)
+            )
+        )
+
+        XCTAssertGreaterThan(
+            countNearWhitePixels(in: rendered),
+            40,
+            "the burned-in watermark must contain visible white glyph pixels, not only its dark background"
+        )
     }
 
     func testSealOpenRoundTrip() throws {
@@ -343,6 +378,45 @@ final class SessionPhaseTests: XCTestCase {
         XCTAssertTrue(SessionPhase.recording.canTransition(to: .failed))
         XCTAssertTrue(SessionPhase.failed.canTransition(to: .draft))
     }
+}
+
+private func fill(pixelBuffer: CVPixelBuffer, red: UInt8, green: UInt8, blue: UInt8) {
+    CVPixelBufferLockBaseAddress(pixelBuffer, [])
+    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
+    guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
+    let width = CVPixelBufferGetWidth(pixelBuffer)
+    let height = CVPixelBufferGetHeight(pixelBuffer)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+    for row in 0..<height {
+        let bytes = baseAddress.advanced(by: row * bytesPerRow).assumingMemoryBound(to: UInt8.self)
+        for column in 0..<width {
+            let offset = column * 4
+            bytes[offset] = blue
+            bytes[offset + 1] = green
+            bytes[offset + 2] = red
+            bytes[offset + 3] = 255
+        }
+    }
+}
+
+private func countNearWhitePixels(in pixelBuffer: CVPixelBuffer) -> Int {
+    CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+    defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+    guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return 0 }
+    let width = CVPixelBufferGetWidth(pixelBuffer)
+    let height = CVPixelBufferGetHeight(pixelBuffer)
+    let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+    var count = 0
+    for row in 0..<height {
+        let bytes = baseAddress.advanced(by: row * bytesPerRow).assumingMemoryBound(to: UInt8.self)
+        for column in 0..<width {
+            let offset = column * 4
+            if bytes[offset] > 220, bytes[offset + 1] > 220, bytes[offset + 2] > 220 {
+                count += 1
+            }
+        }
+    }
+    return count
 }
 
 @MainActor

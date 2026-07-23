@@ -482,22 +482,6 @@
         }
       }
     },
-    "全部删除" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delete all"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "すべて削除"
-          }
-        }
-      }
-    },
     "全屏播放" : {
       "localizations" : {
         "en" : {
@@ -510,6 +494,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "フルスクリーンで再生"
+          }
+        }
+      }
+    },
+    "全部删除" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete all"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "すべて削除"
           }
         }
       }
@@ -1724,6 +1724,23 @@
         }
       }
     },
+    "我叫 %@，我已经成年，我同意并自愿与 %@ 发生性关系，我意识清醒，没有受到任何形式的胁迫。" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My name is %@. I am an adult. I consent and willingly agree to have sex with %@. I am clear-minded and have not been subjected to any form of coercion."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "私の名前は%@です。私は成人です。私は%@と性行為をすることに同意し、自ら望んでいます。私は意識が清明で、いかなる形の強要も受けていません。"
+          }
+        }
+      }
+    },
     "我已阅读并理解以上说明" : {
       "localizations" : {
         "en" : {
@@ -1736,22 +1753,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上の説明を読み、理解しました"
-          }
-        }
-      }
-    },
-    "我叫 %@，我已经成年，我同意并自愿与 %@ 发生性关系，我意识清醒，没有受到任何形式的胁迫。" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "My name is %@. I am an adult. I consent and willingly agree to have sex with %@. I am clear-minded and have not been subjected to any form of coercion."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "私の名前は%@です。私は成人です。私は%@と性行為をすることに同意し、自ら望んでいます。私は意識が清明で、いかなる形の強要も受けていません。"
           }
         }
       }
@@ -4051,22 +4052,6 @@
         }
       }
     },
-    "退出全屏" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Exit full screen"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "フルスクリーンを終了"
-          }
-        }
-      }
-    },
     "返回首页" : {
 
     },
@@ -4181,6 +4166,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "接続が切れました。クリップは最長10分間一時保存されます。QRコードをもう一度表示またはスキャンしてペアリングしてください。"
+          }
+        }
+      }
+    },
+    "退出全屏" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exit full screen"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フルスクリーンを終了"
           }
         }
       }

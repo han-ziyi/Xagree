@@ -585,6 +585,8 @@ final class WatermarkRenderer: @unchecked Sendable {
 
         cgContext.translateBy(x: 0, y: CGFloat(targetH))
         cgContext.scaleBy(x: 1, y: -1)
+        UIGraphicsPushContext(cgContext)
+        defer { UIGraphicsPopContext() }
 
         let fontSize = max(14, CGFloat(targetW) * 0.026)
         let attributes: [NSAttributedString.Key: Any] = [
