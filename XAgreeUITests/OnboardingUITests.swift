@@ -1,10 +1,11 @@
 import XCTest
 
 /// UI 测试：引导、私密空间、首页导航与单备份表单（不依赖真机相机）。
+@MainActor
 final class OnboardingUITests: XCTestCase {
     private var app: XCUIApplication!
 
-    override func setUpWithError() throws {
+    private func prepareApp() {
         continueAfterFailure = false
         app = XCUIApplication()
         app.launchArguments = ["-UITesting", "-UITestingReset"]
@@ -132,6 +133,7 @@ final class OnboardingUITests: XCTestCase {
     // MARK: - Tests
 
     func testOnboardingToHomeFlow() throws {
+        prepareApp()
         // 隐私说明
         XCTAssertTrue(app.staticTexts["把这一刻，留给彼此"].waitForExistence(timeout: 6))
         waitTap("onboarding.privacy.continue")
@@ -191,6 +193,7 @@ final class OnboardingUITests: XCTestCase {
     }
 
     func testSkipToHomeAndNavigateSingleSession() throws {
+        prepareApp()
         launchSkipToHome()
 
         waitTap("home.single")
@@ -238,6 +241,7 @@ final class OnboardingUITests: XCTestCase {
     }
 
     func testHomeLockReturnsToUnlock() throws {
+        prepareApp()
         launchSkipToHome()
 
         let lock = scrollTo("home.lock")
@@ -253,6 +257,7 @@ final class OnboardingUITests: XCTestCase {
     }
 
     func testWrongUnlockPasswordShowsAlert() throws {
+        prepareApp()
         launchSkipToHome()
 
         let lock = scrollTo("home.lock")
@@ -276,12 +281,14 @@ final class OnboardingUITests: XCTestCase {
     }
 
     func testOpenEncryptedFileScreen() throws {
+        prepareApp()
         launchSkipToHome()
         waitTap("home.openFile")
         XCTAssertTrue(app.navigationBars["打开加密文件"].waitForExistence(timeout: 5))
     }
 
     func testDualSessionEntry() throws {
+        prepareApp()
         launchSkipToHome()
         waitTap("home.dual")
         XCTAssertTrue(app.navigationBars["双机记录"].waitForExistence(timeout: 5))

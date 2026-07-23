@@ -263,8 +263,18 @@
     "无法确认配对" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to confirm pairing" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "ペアリングを確認できません" } } } },
     "无法删除草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to delete draft" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを削除できません" } } } },
     "无法保留草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to keep draft" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを保持できません" } } } },
+    "无法完成导出" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to finish export" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出しを完了できません" } } } },
+    "无法完整结束会话" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to fully end session" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "セッションを完全に終了できません" } } } },
+    "无法完整读取草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Some drafts could not be read" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部の下書きを読み込めません" } } } },
+    "无法读取头像" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to read profile photo" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "プロフィール画像を読み込めません" } } } },
+    "无法读取待导出草稿目录。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The export draft directory could not be read." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出し待ちの下書きフォルダを読み込めません。" } } } },
+    "无法清理暂存" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to clean up staged data" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "一時保存データを整理できません" } } } },
     "无法清理草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to clean up draft" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを整理できません" } } } },
-    "待导出草稿索引损坏，无法安全更新。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The export draft index is damaged and cannot be updated safely." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出し待ちの下書き一覧が破損しているため、安全に更新できません。" } } } }
+    "待导出草稿索引损坏，无法安全更新。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The export draft index is damaged and cannot be updated safely." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出し待ちの下書き一覧が破損しているため、安全に更新できません。" } } } },
+    "该二维码不属于当前暂存会话。请使用原配对中的另一台设备。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "This QR code does not belong to the staged session. Use the other device from the original pairing." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "このQRコードは現在の一時保存セッションのものではありません。元のペアリングで使用したもう一台のデバイスを使ってください。" } } } },
+    "所选图片无法读取、过大或格式不受支持。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The selected image cannot be read, is too large, or uses an unsupported format." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "選択した画像は読み込めないか、大きすぎるか、対応していない形式です。" } } } },
+    "草稿已单独保留" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Draft saved separately" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを個別に保存しました" } } } },
+    "部分草稿恢复记录已损坏，无法显示。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Some draft recovery records are damaged and cannot be shown." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "一部の下書き復元レコードが破損しているため、表示できません。" } } } }
   },
   "version" : "1.0"
 }

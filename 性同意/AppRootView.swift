@@ -415,8 +415,15 @@ struct ProfileSetupView: View {
             .appScreenBackground()
             .task(id: pickerItem) {
                 guard let pickerItem else { return }
-                if let data = try? await pickerItem.loadTransferable(type: Data.self) {
-                    avatarData = AvatarThumbnail.make(from: data)
+                do {
+                    avatarData = try await AvatarThumbnail.load(from: pickerItem)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    appState.transientError = AppError(
+                        title: "无法读取头像",
+                        detail: error.localizedDescription
+                    )
                 }
             }
             .onAppear {
@@ -766,8 +773,15 @@ struct ProfileAndPrivacyView: View {
         }
         .task(id: pickerItem) {
             guard let pickerItem else { return }
-            if let data = try? await pickerItem.loadTransferable(type: Data.self) {
-                avatarData = AvatarThumbnail.make(from: data)
+            do {
+                avatarData = try await AvatarThumbnail.load(from: pickerItem)
+            } catch is CancellationError {
+                return
+            } catch {
+                appState.transientError = AppError(
+                    title: "无法读取头像",
+                    detail: error.localizedDescription
+                )
             }
         }
         .confirmationDialog("清除本机私密空间？", isPresented: $showReset, titleVisibility: .visible) {
@@ -821,7 +835,23 @@ struct PrivacyShieldView: View {
     }
 }
 
+enum AvatarThumbnailError: LocalizedError {
+    case invalidImage
+
+    var errorDescription: String? {
+        L10n.string("所选图片无法读取、过大或格式不受支持。")
+    }
+}
+
 enum AvatarThumbnail {
+    static func load(from item: PhotosPickerItem) async throws -> Data {
+        guard let data = try await item.loadTransferable(type: Data.self),
+              let thumbnail = make(from: data) else {
+            throw AvatarThumbnailError.invalidImage
+        }
+        return thumbnail
+    }
+
     static func make(from data: Data) -> Data? {
         guard !data.isEmpty, data.count <= 10 * 1_024 * 1_024 else { return nil }
         guard let image = UIImage(data: data) else { return nil }

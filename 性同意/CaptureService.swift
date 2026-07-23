@@ -354,7 +354,7 @@ final class CaptureService: NSObject, ObservableObject {
     }
 }
 
-private final class WriterFinishContext: @unchecked Sendable {
+private nonisolated final class WriterFinishContext: @unchecked Sendable {
     let writer: AVAssetWriter?
     let video: AVAssetWriterInput?
     let audio: AVAssetWriterInput?

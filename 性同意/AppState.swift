@@ -36,8 +36,8 @@ final class AppState: ObservableObject {
                 activePassword = UITestCredentials.password
                 self.profile = profile
                 preferredBackupMode = vaultStore.preferredBackupMode
-                exportDrafts = DraftStore.listDrafts()
                 phase = profile == nil ? .setupProfile : .home
+                refreshDrafts()
                 return
             } catch {
                 // 回落到正常启动路径
@@ -53,7 +53,7 @@ final class AppState: ObservableObject {
         } else {
             phase = .setupVault
         }
-        exportDrafts = DraftStore.listDrafts()
+        refreshDrafts()
     }
 
     var passwordHint: String? {
@@ -82,7 +82,7 @@ final class AppState: ObservableObject {
         activePassword = password
         profile = unlockedProfile
         preferredBackupMode = vaultStore.preferredBackupMode
-        exportDrafts = DraftStore.listDrafts()
+        refreshDrafts()
         if unlockedProfile == nil {
             phase = .setupProfile
         } else {
@@ -130,7 +130,14 @@ final class AppState: ObservableObject {
     }
 
     func refreshDrafts() {
-        exportDrafts = DraftStore.listDrafts()
+        let snapshot = DraftStore.snapshot()
+        exportDrafts = snapshot.drafts
+        if transientError == nil, !snapshot.issues.isEmpty {
+            transientError = AppError(
+                title: "无法完整读取草稿",
+                detail: snapshot.issues.map(\.localizedDescription).joined(separator: "\n")
+            )
+        }
     }
 
     func deleteDraft(_ draft: ExportDraft) throws {

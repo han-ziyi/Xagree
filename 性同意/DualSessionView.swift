@@ -3,6 +3,7 @@ import VisionKit
 
 struct DualSessionView: View {
     let profile: ParticipantProfile
+    @EnvironmentObject private var appState: AppState
     @StateObject private var coordinator: PeerSessionCoordinator
     @StateObject private var workflow: DualSessionModel
     @State private var joinCode = ""
@@ -22,29 +23,12 @@ struct DualSessionView: View {
                 if workflow.needsTransferRecoveryUI || workflow.stage == .recoverStaging {
                     // 传输/暂存阶段保留流程，支持 10 分钟内重新配对
                     DualRecordingFlow(model: workflow)
-                    if case .failed = coordinator.state {
+                    if coordinator.state != .paired {
                         Divider()
-                        Text("连接已断开。片段仍暂存最多 10 分钟，请重新展示/扫描二维码配对。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                        startView
+                        connectionView
                     }
                 } else {
-                    switch coordinator.state {
-                    case .idle, .failed:
-                        startView
-                    case .hosting:
-                        hostView
-                    case .searching, .connecting:
-                        ProgressView(coordinator.state.title)
-                            .controlSize(.large)
-                            .padding(.top, 80)
-                    case .awaitingConfirmation:
-                        confirmationView
-                    case .paired:
-                        pairedView
-                    }
+                    connectionView
                 }
             }
             .padding(24)
@@ -55,10 +39,11 @@ struct DualSessionView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
             let keepStaging = workflow.needsTransferRecoveryUI || workflow.stage == .recoverStaging
-            if !keepStaging {
-                coordinator.stop()
+            if let error = workflow.cancel(clearStaging: !keepStaging) {
+                appState.transientError = error
             }
-            workflow.cancel(clearStaging: !keepStaging)
+            coordinator.stop()
+            appState.refreshDrafts()
         }
         .sheet(isPresented: $showScanner) {
             if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
@@ -78,6 +63,24 @@ struct DualSessionView: View {
         }
     }
 
+    @ViewBuilder
+    private var connectionView: some View {
+        switch coordinator.state {
+        case .idle, .failed:
+            startView
+        case .hosting:
+            hostView
+        case .searching, .connecting:
+            ProgressView(coordinator.state.title)
+                .controlSize(.large)
+                .padding(.top, 80)
+        case .awaitingConfirmation:
+            confirmationView
+        case .paired:
+            pairedView
+        }
+    }
+
     private var startView: some View {
         VStack(spacing: 18) {
             Image(systemName: "heart.circle.fill")
@@ -90,8 +93,8 @@ struct DualSessionView: View {
                 .foregroundStyle(.secondary)
             Button {
                 do {
-                    workflow.reset()
-                    try coordinator.host()
+                    let recoverySessionID = try workflow.prepareForPairing()
+                    try coordinator.host(sessionID: recoverySessionID)
                 } catch {
                     self.error = AppError(title: "无法开始配对", detail: error.localizedDescription)
                 }
@@ -181,8 +184,11 @@ struct DualSessionView: View {
 
     private func join(code: String) {
         do {
-            workflow.reset()
-            try coordinator.join(invitationCode: code)
+            let recoverySessionID = try workflow.prepareForPairing()
+            try coordinator.join(
+                invitationCode: code,
+                expectedSessionID: recoverySessionID
+            )
             joinCode.removeAll()
         } catch {
             self.error = AppError(title: "无法连接", detail: error.localizedDescription)

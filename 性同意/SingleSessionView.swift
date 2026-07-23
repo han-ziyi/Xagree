@@ -41,7 +41,7 @@ final class SingleSessionModel: ObservableObject {
         participantB = participantB.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !participantA.isEmpty, !participantB.isEmpty else { throw SessionFailure.missingParticipantName }
         // 清理上一次失败残留的片段，避免文件泄漏与脏状态
-        clearWorkingMedia(keepEncryptedPackage: true)
+        clearWorkingMedia()
         if sessionPhase == .failed || sessionPhase == .completed {
             try transition(to: .draft)
         }
@@ -88,11 +88,13 @@ final class SingleSessionModel: ObservableObject {
             if segments[role]?.url != artifact.url {
                 EvidenceCryptor.remove(artifact.url)
             }
-            clearWorkingMedia(keepEncryptedPackage: true)
-            self.error = AppError(title: "视频处理失败", detail: error.localizedDescription)
+            clearWorkingMedia()
+            reportFailure(
+                title: "视频处理失败",
+                error: error,
+                transitions: [.failed, .draft]
+            )
             stage = .details
-            try? transition(to: .failed)
-            try? transition(to: .draft)
         }
     }
 
@@ -153,15 +155,22 @@ final class SingleSessionModel: ObservableObject {
             stage = .export
         } catch {
             // 允许回到 protect 后再次加密
-            if sessionPhase == .encrypting {
-                try? transition(to: .assembling)
-            }
-            self.error = AppError(title: "加密失败", detail: error.localizedDescription)
+            reportFailure(
+                title: "加密失败",
+                error: error,
+                transitions: sessionPhase == .encrypting ? [.assembling] : []
+            )
             stage = .protect
         }
     }
 
     func finishExport() {
+        do {
+            try transition(to: .completed)
+        } catch {
+            self.error = AppError(title: "无法完成导出", detail: error.localizedDescription)
+            return
+        }
         if let url = encryptedPackageURL {
             // 若指向草稿目录，同步删草稿索引
             if url.path.contains("/Drafts/") {
@@ -176,7 +185,6 @@ final class SingleSessionModel: ObservableObject {
             EvidenceCryptor.remove(url)
         }
         encryptedPackageURL = nil
-        try? transition(to: .completed)
         stage = .complete
     }
 
@@ -184,12 +192,16 @@ final class SingleSessionModel: ObservableObject {
         guard let url = encryptedPackageURL else { return }
         if saveDraft {
             do {
-                let draft = try DraftStore.saveExportDraft(from: url, mode: .single)
+                let result = try DraftStore.preserveExportDraft(from: url, mode: .single)
+                let draft = result.draft
                 // 删除临时包，但保留草稿路径以便“重新打开保存器”
                 if url.path != DraftStore.draftURL(for: draft).path {
                     EvidenceCryptor.remove(url)
                 }
                 encryptedPackageURL = DraftStore.draftURL(for: draft)
+                if let warning = result.warning {
+                    error = AppError(title: "草稿已单独保留", detail: warning.localizedDescription)
+                }
                 return
             } catch {
                 self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
@@ -200,32 +212,60 @@ final class SingleSessionModel: ObservableObject {
         encryptedPackageURL = nil
     }
 
-    func cancel() {
+    @discardableResult
+    func cancel() -> AppError? {
+        var cancellationError: AppError?
+        var canReleasePackageReference = true
         // 导出阶段离开时保留草稿，不重复删除草稿路径中的文件
         if let encryptedPackageURL {
             let isDraft = encryptedPackageURL.path.contains("/Drafts/")
             if !isDraft {
                 do {
-                    _ = try DraftStore.saveExportDraft(from: encryptedPackageURL, mode: .single)
+                    let result = try DraftStore.preserveExportDraft(
+                        from: encryptedPackageURL,
+                        mode: .single
+                    )
                     EvidenceCryptor.remove(encryptedPackageURL)
+                    self.encryptedPackageURL = DraftStore.draftURL(for: result.draft)
+                    if let warning = result.warning {
+                        cancellationError = AppError(
+                            title: "草稿已单独保留",
+                            detail: warning.localizedDescription
+                        )
+                    }
                 } catch {
-                    self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
+                    canReleasePackageReference = false
+                    cancellationError = AppError(title: "无法保留草稿", detail: error.localizedDescription)
                 }
             }
         }
-        clearWorkingMedia(keepEncryptedPackage: false)
-        encryptedPackageURL = nil
+        clearWorkingMedia()
+        if canReleasePackageReference {
+            encryptedPackageURL = nil
+        }
+        self.error = cancellationError
+        return cancellationError
     }
 
-    private func clearWorkingMedia(keepEncryptedPackage: Bool) {
+    private func clearWorkingMedia() {
         EvidenceCryptor.remove(finalVideoURL)
         finalVideoURL = nil
         for segment in segments.values { EvidenceCryptor.remove(segment.url) }
         segments.removeAll()
         completedSegmentManifests = []
-        if !keepEncryptedPackage {
-            // 调用方自行处理 encryptedPackageURL
+    }
+
+    private func reportFailure(title: String, error: Error, transitions: [SessionPhase]) {
+        var details = [error.localizedDescription]
+        for next in transitions {
+            do {
+                try transition(to: next)
+            } catch {
+                details.append(error.localizedDescription)
+                break
+            }
         }
+        self.error = AppError(title: title, detail: details.joined(separator: "\n"))
     }
 
     private func transition(to next: SessionPhase) throws {
@@ -270,7 +310,9 @@ struct SingleSessionView: View {
             Alert(title: Text(error.title), message: Text(error.detail), dismissButton: .default(Text("知道了")))
         }
         .onDisappear {
-            model.cancel()
+            if let error = model.cancel() {
+                appState.transientError = error
+            }
             appState.refreshDrafts()
         }
     }

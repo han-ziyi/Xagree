@@ -35,6 +35,10 @@ final class DualSessionModel: ObservableObject {
     init(profile: ParticipantProfile, coordinator: PeerSessionCoordinator) {
         self.profile = profile
         self.coordinator = coordinator
+        if DraftStore.activeStagingSessionID() != nil {
+            stage = .recoverStaging
+            sessionPhase = .transferring
+        }
     }
 
     var localRole: ParticipantRole { coordinator.localRole ?? .a }
@@ -60,9 +64,22 @@ final class DualSessionModel: ObservableObject {
         vaultPasswordForStaging = password
     }
 
-    func reset() {
+    func prepareForPairing() throws -> UUID? {
+        if needsTransferRecoveryUI || stage == .recoverStaging {
+            guard let sessionID = coordinator.currentSessionID ?? DraftStore.activeStagingSessionID() else {
+                throw SessionFailure.stagingExpired
+            }
+            return sessionID
+        }
+        try reset()
+        return nil
+    }
+
+    func reset() throws {
         // 新配对时清除内存中的旧片段引用；磁盘暂存由 clearStaging 参数控制
-        cancel(clearStaging: false)
+        if let error = cancel(clearStaging: false) {
+            throw error
+        }
         localSegment = nil
         retainedRemoteManifest = nil
         stage = .ready
@@ -80,8 +97,11 @@ final class DualSessionModel: ObservableObject {
     func markReady() {
         do {
             markPairedIfNeeded()
-            try transition(to: .armed)
+            guard sessionPhase.canTransition(to: .armed) else {
+                throw SessionFailure.illegalTransition(from: sessionPhase, to: .armed)
+            }
             try coordinator.markRecordingReady()
+            sessionPhase = .armed
             stage = .waitingToRecord
         } catch {
             self.error = AppError(title: "无法准备录制", detail: error.localizedDescription)
@@ -97,10 +117,8 @@ final class DualSessionModel: ObservableObject {
         )
     }
 
-    func markRecordingStarted() {
-        if sessionPhase == .armed {
-            try? transition(to: .recording)
-        }
+    func markRecordingStarted() throws {
+        try transition(to: .recording)
     }
 
     func recordingFinished(artifact: CaptureArtifact) async {
@@ -139,23 +157,23 @@ final class DualSessionModel: ObservableObject {
             stage = .waitingForPeer
             await assembleIfReady()
         } catch {
-            self.error = AppError(title: "视频处理或传输失败", detail: error.localizedDescription)
             if stagingSucceeded, localSegment != nil, FileManager.default.fileExists(atPath: artifact.url.path) {
                 // 本地片段已就绪（可能已暂存），进入恢复流程而非丢弃重录
                 stage = .recoverStaging
-                if sessionPhase != .transferring {
-                    if sessionPhase.canTransition(to: .transferring) {
-                        try? transition(to: .transferring)
-                    } else if sessionPhase == .recording {
-                        try? transition(to: .transferring)
-                    }
-                }
+                reportFailure(
+                    title: "视频处理或传输失败",
+                    error: error,
+                    transitions: sessionPhase == .recording ? [.transferring] : []
+                )
             } else {
                 EvidenceCryptor.remove(artifact.url)
                 localSegment = nil
                 stage = .ready
-                try? transition(to: .failed)
-                try? transition(to: .draft)
+                reportFailure(
+                    title: "视频处理或传输失败",
+                    error: error,
+                    transitions: [.failed, .draft]
+                )
             }
         }
     }
@@ -209,6 +227,14 @@ final class DualSessionModel: ObservableObject {
               FileManager.default.fileExists(atPath: local.url.path) else {
             error = AppError(title: "无法恢复", detail: "暂存片段文件已失效，请重新录制。")
             stage = .ready
+            return
+        }
+        guard coordinator.currentSessionID == local.manifest.watermark.sessionID else {
+            error = AppError(
+                title: "无法恢复",
+                detail: PeerPairingError.recoverySessionMismatch.localizedDescription
+            )
+            stage = .recoverStaging
             return
         }
         do {
@@ -275,20 +301,31 @@ final class DualSessionModel: ObservableObject {
             EvidenceCryptor.remove(finalVideoURL)
             self.finalVideoURL = nil
             if let sessionID = coordinator.currentSessionID {
-                try? DraftStore.clearStaging(sessionID: sessionID)
+                do {
+                    try DraftStore.clearStaging(sessionID: sessionID)
+                } catch {
+                    self.error = AppError(title: "无法清理暂存", detail: error.localizedDescription)
+                }
             }
             try transition(to: .awaitingExport)
             stage = .export
         } catch {
-            if sessionPhase == .encrypting {
-                try? transition(to: .assembling)
-            }
-            self.error = AppError(title: "加密失败", detail: error.localizedDescription)
+            reportFailure(
+                title: "加密失败",
+                error: error,
+                transitions: sessionPhase == .encrypting ? [.assembling] : []
+            )
             stage = .protect
         }
     }
 
     func finishExport() {
+        do {
+            try transition(to: .completed)
+        } catch {
+            self.error = AppError(title: "无法完成导出", detail: error.localizedDescription)
+            return
+        }
         if let url = encryptedPackageURL {
             if url.path.contains("/Drafts/") {
                 for draft in DraftStore.listDrafts() where DraftStore.draftURL(for: draft).path == url.path {
@@ -302,7 +339,6 @@ final class DualSessionModel: ObservableObject {
             EvidenceCryptor.remove(url)
         }
         encryptedPackageURL = nil
-        try? transition(to: .completed)
         stage = .complete
     }
 
@@ -310,11 +346,15 @@ final class DualSessionModel: ObservableObject {
         guard let url = encryptedPackageURL else { return }
         if saveDraft {
             do {
-                let draft = try DraftStore.saveExportDraft(from: url, mode: .dual)
+                let result = try DraftStore.preserveExportDraft(from: url, mode: .dual)
+                let draft = result.draft
                 if url.path != DraftStore.draftURL(for: draft).path {
                     EvidenceCryptor.remove(url)
                 }
                 encryptedPackageURL = DraftStore.draftURL(for: draft)
+                if let warning = result.warning {
+                    error = AppError(title: "草稿已单独保留", detail: warning.localizedDescription)
+                }
                 return
             } catch {
                 self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
@@ -325,14 +365,20 @@ final class DualSessionModel: ObservableObject {
         encryptedPackageURL = nil
     }
 
-    func cancel(clearStaging: Bool = true) {
+    @discardableResult
+    func cancel(clearStaging: Bool = true) -> AppError? {
+        var issueDetails: [String] = []
+        var canReleasePackageReference = true
         if clearStaging {
             EvidenceCryptor.remove(localSegment?.url)
             localSegment = nil
-            if let sessionID = coordinator.currentSessionID {
-                try? DraftStore.clearStaging(sessionID: sessionID)
-            } else if let stagingID = DraftStore.activeStagingSessionID() {
-                try? DraftStore.clearStaging(sessionID: stagingID)
+            let stagingID = coordinator.currentSessionID ?? DraftStore.activeStagingSessionID()
+            if let stagingID {
+                do {
+                    try DraftStore.clearStaging(sessionID: stagingID)
+                } catch {
+                    issueDetails.append(error.localizedDescription)
+                }
             }
         }
         EvidenceCryptor.remove(finalVideoURL)
@@ -340,15 +386,32 @@ final class DualSessionModel: ObservableObject {
             let isDraft = encryptedPackageURL.path.contains("/Drafts/")
             if !isDraft {
                 do {
-                    _ = try DraftStore.saveExportDraft(from: encryptedPackageURL, mode: .dual)
+                    let result = try DraftStore.preserveExportDraft(
+                        from: encryptedPackageURL,
+                        mode: .dual
+                    )
                     EvidenceCryptor.remove(encryptedPackageURL)
+                    self.encryptedPackageURL = DraftStore.draftURL(for: result.draft)
+                    if let warning = result.warning {
+                        issueDetails.append(warning.localizedDescription)
+                    }
                 } catch {
-                    self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
+                    canReleasePackageReference = false
+                    issueDetails.append(error.localizedDescription)
                 }
             }
         }
         finalVideoURL = nil
-        encryptedPackageURL = nil
+        if canReleasePackageReference {
+            encryptedPackageURL = nil
+        }
+        guard !issueDetails.isEmpty else { return nil }
+        let cancellationError = AppError(
+            title: "无法完整结束会话",
+            detail: issueDetails.joined(separator: "\n")
+        )
+        self.error = cancellationError
+        return cancellationError
     }
 
     private func assembleIfReady() async {
@@ -365,12 +428,7 @@ final class DualSessionModel: ObservableObject {
             if sessionPhase == .transferring || sessionPhase == .recording {
                 try transition(to: .assembling)
             } else if sessionPhase != .assembling {
-                // 恢复路径：强制进入 assembling
-                if sessionPhase.canTransition(to: .assembling) {
-                    try transition(to: .assembling)
-                } else {
-                    sessionPhase = .assembling
-                }
+                try transition(to: .assembling)
             }
             try await MediaProcessor.validateSegment(url: remoteURL, expectedSHA256: remoteManifest.sha256)
             try await MediaProcessor.validateSegment(url: local.url, expectedSHA256: local.manifest.sha256)
@@ -387,16 +445,29 @@ final class DualSessionModel: ObservableObject {
             )
             stage = .protect
         } catch {
-            self.error = AppError(title: "无法合并视频", detail: error.localizedDescription)
             stage = .waitingForPeer
             hasStartedAssembly = false
             // 回到 transferring，允许在片段仍在时重试合成（不可落到 draft 导致永久卡死）
-            if sessionPhase == .assembling {
-                try? transition(to: .transferring)
-            } else if sessionPhase == .failed {
-                try? transition(to: .transferring)
+            let shouldReturnToTransfer = sessionPhase == .assembling || sessionPhase == .failed
+            reportFailure(
+                title: "无法合并视频",
+                error: error,
+                transitions: shouldReturnToTransfer ? [.transferring] : []
+            )
+        }
+    }
+
+    private func reportFailure(title: String, error: Error, transitions: [SessionPhase]) {
+        var details = [error.localizedDescription]
+        for next in transitions {
+            do {
+                try transition(to: next)
+            } catch {
+                details.append(error.localizedDescription)
+                break
             }
         }
+        self.error = AppError(title: title, detail: details.joined(separator: "\n"))
     }
 
     private func transition(to next: SessionPhase) throws {
@@ -594,8 +665,8 @@ private struct DualCaptureView: View {
             }
             let nextWatermark = model.watermark()
             watermark = nextWatermark
-            model.markRecordingStarted()
             do {
+                try model.markRecordingStarted()
                 let artifact = try await capture.begin(CaptureRequest(watermark: nextWatermark))
                 await model.recordingFinished(artifact: artifact)
             } catch {

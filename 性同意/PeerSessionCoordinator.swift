@@ -3,12 +3,13 @@ import Combine
 import CryptoKit
 import Foundation
 
-enum PeerPairingError: LocalizedError {
+enum PeerPairingError: LocalizedError, Equatable {
     case invalidInvitation
     case invalidPeerMessage
     case keyAgreementFailed
     case localNetworkUnavailable
     case invalidState
+    case recoverySessionMismatch
 
     var errorDescription: String? {
         switch self {
@@ -17,6 +18,7 @@ enum PeerPairingError: LocalizedError {
         case .keyAgreementFailed: L10n.string("无法建立安全的双机密钥。")
         case .localNetworkUnavailable: L10n.string("无法使用本地网络。请允许本地网络权限并保持两台设备靠近。")
         case .invalidState: L10n.string("当前配对状态不允许此操作。")
+        case .recoverySessionMismatch: L10n.string("该二维码不属于当前暂存会话。请使用原配对中的另一台设备。")
         }
     }
 }
@@ -133,10 +135,10 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
 
     var currentSessionID: UUID? { sessionID }
 
-    func host() throws {
+    func host(sessionID recoverySessionID: UUID? = nil) throws {
         stop()
         let key = Curve25519.KeyAgreement.PrivateKey()
-        let id = UUID()
+        let id = recoverySessionID ?? UUID()
         let peer = makePeerID()
         let session = MCSession(peer: peer, securityIdentity: nil, encryptionPreference: .required)
         session.delegate = self
@@ -163,8 +165,11 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         advertiser.startAdvertisingPeer()
     }
 
-    func join(invitationCode: String) throws {
+    func join(invitationCode: String, expectedSessionID: UUID? = nil) throws {
         let invitation = try PairingInvitation.decode(invitationCode)
+        if let expectedSessionID, invitation.sessionID != expectedSessionID {
+            throw PeerPairingError.recoverySessionMismatch
+        }
         stop()
         let key = Curve25519.KeyAgreement.PrivateKey()
         let hostKey = try Curve25519.KeyAgreement.PublicKey(rawRepresentation: invitation.hostPublicKey)
@@ -196,8 +201,8 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
 
     func markRecordingReady() throws {
         guard state == .paired, let sessionID else { throw PeerPairingError.invalidState }
-        localRecordingReady = true
         try sendEncrypted(RecordingControl(action: .ready, sessionID: sessionID), kind: "recording")
+        localRecordingReady = true
         if localRole == .a, remoteRecordingReady {
             try beginRecording()
         }

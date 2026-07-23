@@ -2,9 +2,18 @@ import Foundation
 
 enum DraftStoreError: LocalizedError, Equatable {
     case corruptIndex
+    case corruptRecoveryRecord
+    case unreadableDraftDirectory
 
     var errorDescription: String? {
-        L10n.string("待导出草稿索引损坏，无法安全更新。")
+        switch self {
+        case .corruptIndex:
+            L10n.string("待导出草稿索引损坏，无法安全更新。")
+        case .corruptRecoveryRecord:
+            L10n.string("部分草稿恢复记录已损坏，无法显示。")
+        case .unreadableDraftDirectory:
+            L10n.string("无法读取待导出草稿目录。")
+        }
     }
 }
 
@@ -13,27 +22,96 @@ enum DraftStoreError: LocalizedError, Equatable {
 enum DraftStore {
     private static let stagingTTL: TimeInterval = 10 * 60
 
+    struct Snapshot {
+        let drafts: [ExportDraft]
+        let issues: [DraftStoreError]
+    }
+
+    struct PreserveResult {
+        let draft: ExportDraft
+        let warning: DraftStoreError?
+    }
+
     static func listDrafts() -> [ExportDraft] {
-        guard let data = try? Data(contentsOf: AppFiles.draftsIndexURL),
-              let drafts = try? JSONDecoder().decode([ExportDraft].self, from: data) else {
-            return []
+        snapshot().drafts
+    }
+
+    static func snapshot() -> Snapshot {
+        var issues: [DraftStoreError] = []
+        var drafts: [ExportDraft] = []
+
+        do {
+            drafts = try readIndex().filter(isUsableDraft)
+        } catch {
+            issues.append(.corruptIndex)
         }
-        return drafts.filter(isUsableDraft)
+
+        if FileManager.default.fileExists(atPath: AppFiles.draftsURL.path) {
+            do {
+                let files = try FileManager.default.contentsOfDirectory(
+                    at: AppFiles.draftsURL,
+                    includingPropertiesForKeys: nil
+                )
+                for file in files where file.lastPathComponent.hasSuffix(".draft.json") {
+                    do {
+                        let draft = try JSONDecoder().decode(
+                            ExportDraft.self,
+                            from: Data(contentsOf: file)
+                        )
+                        if isUsableDraft(draft) {
+                            drafts.append(draft)
+                        } else {
+                            issues.append(.corruptRecoveryRecord)
+                        }
+                    } catch {
+                        issues.append(.corruptRecoveryRecord)
+                    }
+                }
+            } catch {
+                issues.append(.unreadableDraftDirectory)
+            }
+        }
+
+        var seenIDs = Set<UUID>()
+        var seenPaths = Set<String>()
+        let uniqueDrafts = drafts.filter { draft in
+            seenIDs.insert(draft.id).inserted
+                && seenPaths.insert(draftURL(for: draft).standardizedFileURL.path).inserted
+        }
+        return Snapshot(
+            drafts: uniqueDrafts.sorted { $0.createdAt > $1.createdAt },
+            issues: issues.reduce(into: []) { uniqueIssues, issue in
+                if !uniqueIssues.contains(issue) {
+                    uniqueIssues.append(issue)
+                }
+            }
+        )
+    }
+
+    static func preserveExportDraft(from packageURL: URL, mode: BackupMode) throws -> PreserveResult {
+        do {
+            return PreserveResult(
+                draft: try saveExportDraft(from: packageURL, mode: mode),
+                warning: nil
+            )
+        } catch DraftStoreError.corruptIndex {
+            return PreserveResult(
+                draft: try saveRecoveryDraft(from: packageURL, mode: mode),
+                warning: .corruptIndex
+            )
+        }
     }
 
     static func saveExportDraft(from packageURL: URL, mode: BackupMode) throws -> ExportDraft {
         try AppFiles.prepareDirectories()
         let id = UUID()
-        let fileName = "pending-\(id.uuidString.prefix(8)).xagree"
+        let fileName = "pending-\(id.uuidString).xagree"
         let destination = AppFiles.draftsURL.appendingPathComponent(fileName)
         var committed = false
         defer {
             if !committed {
                 try? FileManager.default.removeItem(at: destination)
             }
-        }
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
         }
         try FileManager.default.copyItem(at: packageURL, to: destination)
         try AppFiles.protect(url: destination)
@@ -52,8 +130,15 @@ enum DraftStore {
     }
 
     static func deleteDraft(_ draft: ExportDraft) throws {
+        let recoveryURL = recoveryMetadataURL(for: draft)
+        if FileManager.default.fileExists(atPath: recoveryURL.path) {
+            try AppFiles.removeItemIfExists(draftURL(for: draft))
+            try AppFiles.removeItemIfExists(recoveryURL)
+            return
+        }
+        let remainingDrafts = try readIndex().filter { $0.id != draft.id }
+        try writeIndex(remainingDrafts)
         try AppFiles.removeItemIfExists(draftURL(for: draft))
-        try writeIndex(readIndex().filter { $0.id != draft.id })
     }
 
     static func deleteAllDrafts() throws {
@@ -101,7 +186,20 @@ enum DraftStore {
             password: vaultPassword
         )
         let destination = AppFiles.stagingURL.appendingPathComponent(fileName)
+        let metadataURL = AppFiles.stagingURL.appendingPathComponent("\(sessionID.uuidString).json")
+        var committed = false
+        var replacementStarted = false
+        defer {
+            if !committed {
+                EvidenceCryptor.remove(package)
+                if replacementStarted {
+                    try? FileManager.default.removeItem(at: destination)
+                    try? FileManager.default.removeItem(at: metadataURL)
+                }
+            }
+        }
         try AppFiles.removeItemIfExists(destination)
+        replacementStarted = true
         try FileManager.default.moveItem(at: package, to: destination)
         try AppFiles.protect(url: destination)
         let record = StagingRecord(
@@ -111,9 +209,9 @@ enum DraftStore {
             manifest: manifest,
             fileName: fileName
         )
-        let metadataURL = AppFiles.stagingURL.appendingPathComponent("\(sessionID.uuidString).json")
         try JSONEncoder().encode(record).write(to: metadataURL, options: .atomic)
         try AppFiles.protect(url: metadataURL)
+        committed = true
     }
 
     static func loadStaging(
@@ -212,6 +310,40 @@ enum DraftStore {
         } catch {
             throw DraftStoreError.corruptIndex
         }
+    }
+
+    private static func saveRecoveryDraft(from packageURL: URL, mode: BackupMode) throws -> ExportDraft {
+        try AppFiles.prepareDirectories()
+        let id = UUID()
+        let fileName = "recovered-\(id.uuidString).xagree"
+        let draft = ExportDraft(
+            id: id,
+            fileName: fileName,
+            createdAt: Date(),
+            mode: mode,
+            relativePath: fileName
+        )
+        let destination = draftURL(for: draft)
+        let metadataURL = recoveryMetadataURL(for: draft)
+        var committed = false
+        defer {
+            if !committed {
+                try? FileManager.default.removeItem(at: destination)
+                try? FileManager.default.removeItem(at: metadataURL)
+            }
+        }
+        try FileManager.default.copyItem(at: packageURL, to: destination)
+        try AppFiles.protect(url: destination)
+        try JSONEncoder().encode(draft).write(to: metadataURL, options: .atomic)
+        try AppFiles.protect(url: metadataURL)
+        committed = true
+        return draft
+    }
+
+    private static func recoveryMetadataURL(for draft: ExportDraft) -> URL {
+        draftURL(for: draft)
+            .deletingPathExtension()
+            .appendingPathExtension("draft.json")
     }
 
     private static func isUsableDraft(_ draft: ExportDraft) -> Bool {

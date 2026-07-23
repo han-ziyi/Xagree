@@ -158,6 +158,41 @@ final class EvidenceCryptoTests: XCTestCase {
         }
     }
 
+    func testDualWorkflowRestoresStagedSessionIdentity() throws {
+        let video = try makeSampleVideoData()
+        let sessionID = UUID()
+        let password = "staging-password-12"
+        let manifest = SegmentManifest(
+            role: .a,
+            duration: 5,
+            sha256: try FileHasher.sha256Hex(of: video),
+            watermark: RecordingWatermark(sessionID: sessionID, role: .a)
+        )
+        defer {
+            EvidenceCryptor.remove(video)
+            try? DraftStore.clearStaging(sessionID: sessionID)
+        }
+
+        try DraftStore.saveStaging(
+            sessionID: sessionID,
+            role: .a,
+            segmentURL: video,
+            manifest: manifest,
+            vaultPassword: password
+        )
+        let coordinator = PeerSessionCoordinator(
+            profile: ParticipantProfile(name: "Alice", avatarData: nil)
+        )
+        let model = DualSessionModel(
+            profile: ParticipantProfile(name: "Alice", avatarData: nil),
+            coordinator: coordinator
+        )
+
+        XCTAssertEqual(model.stage, .recoverStaging)
+        XCTAssertEqual(model.sessionPhase, .transferring)
+        XCTAssertEqual(try model.prepareForPairing(), sessionID)
+    }
+
     func testCorruptDraftIndexDoesNotDeleteSourcePackage() throws {
         let source = try makeSampleVideoData()
         defer {
@@ -174,6 +209,33 @@ final class EvidenceCryptoTests: XCTestCase {
         }
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
         XCTAssertTrue(DraftStore.listDrafts().isEmpty)
+    }
+
+    func testCorruptDraftIndexUsesIndependentRecoveryRecord() throws {
+        let source = try makeSampleVideoData()
+        defer {
+            EvidenceCryptor.remove(source)
+            try? AppFiles.removeItemIfExists(AppFiles.draftsIndexURL)
+            try? AppFiles.clearDirectory(AppFiles.draftsURL)
+        }
+        let corruptIndex = Data("not-json".utf8)
+        try corruptIndex.write(to: AppFiles.draftsIndexURL, options: .atomic)
+
+        let result = try DraftStore.preserveExportDraft(from: source, mode: .dual)
+        let recoveredURL = DraftStore.draftURL(for: result.draft)
+
+        XCTAssertEqual(result.warning, .corruptIndex)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recoveredURL.path))
+        XCTAssertEqual(try Data(contentsOf: AppFiles.draftsIndexURL), corruptIndex)
+
+        let snapshot = DraftStore.snapshot()
+        XCTAssertEqual(snapshot.issues, [.corruptIndex])
+        XCTAssertEqual(snapshot.drafts, [result.draft])
+
+        try DraftStore.deleteDraft(result.draft)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: recoveredURL.path))
+        XCTAssertTrue(DraftStore.snapshot().drafts.isEmpty)
     }
 
     func testUnsupportedVersionRejectedViaCorruptMagic() throws {
@@ -255,6 +317,30 @@ final class SessionPhaseTests: XCTestCase {
         XCTAssertFalse(SessionPhase.completed.canTransition(to: .recording))
         XCTAssertTrue(SessionPhase.recording.canTransition(to: .failed))
         XCTAssertTrue(SessionPhase.failed.canTransition(to: .draft))
+    }
+}
+
+@MainActor
+final class PeerPairingTests: XCTestCase {
+    func testRecoveryPairingRejectsDifferentSession() throws {
+        let invitation = PairingInvitation(
+            version: 1,
+            sessionID: UUID(),
+            hostPeerID: "test-host",
+            hostPublicKey: Data(repeating: 0, count: 32)
+        )
+        let coordinator = PeerSessionCoordinator(
+            profile: ParticipantProfile(name: "Bob", avatarData: nil)
+        )
+
+        XCTAssertThrowsError(
+            try coordinator.join(
+                invitationCode: invitation.encodedString(),
+                expectedSessionID: UUID()
+            )
+        ) { error in
+            XCTAssertEqual(error as? PeerPairingError, .recoverySessionMismatch)
+        }
     }
 }
 
