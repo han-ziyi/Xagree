@@ -261,7 +261,10 @@
     "姓名或头像数据无效。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The name or photo data is invalid." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "名前または画像データが無効です。" } } } },
     "无法开始录制" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to start recording" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "録画を開始できません" } } } },
     "无法确认配对" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to confirm pairing" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "ペアリングを確認できません" } } } },
-    "无法删除草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to delete draft" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを削除できません" } } } }
+    "无法删除草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to delete draft" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを削除できません" } } } },
+    "无法保留草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to keep draft" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを保持できません" } } } },
+    "无法清理草稿" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unable to clean up draft" } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "下書きを整理できません" } } } },
+    "待导出草稿索引损坏，无法安全更新。" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The export draft index is damaged and cannot be updated safely." } }, "ja" : { "stringUnit" : { "state" : "translated", "value" : "書き出し待ちの下書き一覧が破損しているため、安全に更新できません。" } } } }
   },
   "version" : "1.0"
 }

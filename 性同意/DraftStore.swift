@@ -1,5 +1,13 @@
 import Foundation
 
+enum DraftStoreError: LocalizedError, Equatable {
+    case corruptIndex
+
+    var errorDescription: String? {
+        L10n.string("待导出草稿索引损坏，无法安全更新。")
+    }
+}
+
 /// 导出取消后保留的加密待导出包，以及双备份中断时的加密暂存。
 @MainActor
 enum DraftStore {
@@ -10,12 +18,7 @@ enum DraftStore {
               let drafts = try? JSONDecoder().decode([ExportDraft].self, from: data) else {
             return []
         }
-        return drafts.filter {
-            let fileName = URL(fileURLWithPath: $0.relativePath).lastPathComponent
-            return fileName == $0.relativePath
-                && URL(fileURLWithPath: fileName).pathExtension == "xagree"
-                && FileManager.default.fileExists(atPath: draftURL(for: $0).path)
-        }
+        return drafts.filter(isUsableDraft)
     }
 
     static func saveExportDraft(from packageURL: URL, mode: BackupMode) throws -> ExportDraft {
@@ -23,6 +26,12 @@ enum DraftStore {
         let id = UUID()
         let fileName = "pending-\(id.uuidString.prefix(8)).xagree"
         let destination = AppFiles.draftsURL.appendingPathComponent(fileName)
+        var committed = false
+        defer {
+            if !committed {
+                try? FileManager.default.removeItem(at: destination)
+            }
+        }
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)
         }
@@ -35,15 +44,16 @@ enum DraftStore {
             mode: mode,
             relativePath: fileName
         )
-        var drafts = listDrafts()
+        var drafts = try readIndex().filter(isUsableDraft)
         drafts.insert(draft, at: 0)
         try writeIndex(drafts)
+        committed = true
         return draft
     }
 
     static func deleteDraft(_ draft: ExportDraft) throws {
         try AppFiles.removeItemIfExists(draftURL(for: draft))
-        try writeIndex(listDrafts().filter { $0.id != draft.id })
+        try writeIndex(readIndex().filter { $0.id != draft.id })
     }
 
     static func deleteAllDrafts() throws {
@@ -91,7 +101,7 @@ enum DraftStore {
             password: vaultPassword
         )
         let destination = AppFiles.stagingURL.appendingPathComponent(fileName)
-        try? FileManager.default.removeItem(at: destination)
+        try AppFiles.removeItemIfExists(destination)
         try FileManager.default.moveItem(at: package, to: destination)
         try AppFiles.protect(url: destination)
         let record = StagingRecord(
@@ -125,17 +135,31 @@ enum DraftStore {
         }
         let packageURL = AppFiles.stagingURL.appendingPathComponent(record.fileName)
         let decrypted = try EvidenceCryptor.open(packageURL: packageURL, password: vaultPassword)
-        return (decrypted.videoURL, record.manifest)
+        guard decrypted.manifest.sessionID == sessionID,
+              decrypted.manifest.mode == .dual,
+              decrypted.manifest.segments == [record.manifest],
+              decrypted.manifest.finalVideoSHA256 == record.manifest.sha256 else {
+            EvidenceCryptor.remove(decrypted.videoURL)
+            throw EvidenceCryptoError.tamperedPackage
+        }
+        return (decrypted.videoURL, decrypted.manifest.segments[0])
     }
 
     static func clearStaging(sessionID: UUID) throws {
         let metaURL = AppFiles.stagingURL.appendingPathComponent("\(sessionID.uuidString).json")
+        var packageNames = [
+            "\(sessionID.uuidString)-\(ParticipantRole.a.rawValue).xagree",
+            "\(sessionID.uuidString)-\(ParticipantRole.b.rawValue).xagree"
+        ]
         if let data = try? Data(contentsOf: metaURL),
            let record = try? JSONDecoder().decode(StagingRecord.self, from: data) {
             let fileName = URL(fileURLWithPath: record.fileName).lastPathComponent
             if fileName == record.fileName {
-                try AppFiles.removeItemIfExists(AppFiles.stagingURL.appendingPathComponent(fileName))
+                packageNames.append(fileName)
             }
+        }
+        for fileName in Set(packageNames) {
+            try AppFiles.removeItemIfExists(AppFiles.stagingURL.appendingPathComponent(fileName))
         }
         try AppFiles.removeItemIfExists(metaURL)
     }
@@ -176,5 +200,24 @@ enum DraftStore {
         let data = try JSONEncoder().encode(drafts)
         try data.write(to: AppFiles.draftsIndexURL, options: .atomic)
         try AppFiles.protect(url: AppFiles.draftsIndexURL)
+    }
+
+    private static func readIndex() throws -> [ExportDraft] {
+        guard FileManager.default.fileExists(atPath: AppFiles.draftsIndexURL.path) else { return [] }
+        do {
+            return try JSONDecoder().decode(
+                [ExportDraft].self,
+                from: Data(contentsOf: AppFiles.draftsIndexURL)
+            )
+        } catch {
+            throw DraftStoreError.corruptIndex
+        }
+    }
+
+    private static func isUsableDraft(_ draft: ExportDraft) -> Bool {
+        let fileName = URL(fileURLWithPath: draft.relativePath).lastPathComponent
+        return fileName == draft.relativePath
+            && URL(fileURLWithPath: fileName).pathExtension == "xagree"
+            && FileManager.default.fileExists(atPath: draftURL(for: draft).path)
     }
 }

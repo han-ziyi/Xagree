@@ -108,6 +108,74 @@ final class EvidenceCryptoTests: XCTestCase {
         }
     }
 
+    func testStagingRejectsTamperedMetadata() throws {
+        let video = try makeSampleVideoData()
+        let sessionID = UUID()
+        let password = "staging-password-12"
+        let hash = try FileHasher.sha256Hex(of: video)
+        let manifest = SegmentManifest(
+            role: .a,
+            duration: 5,
+            sha256: hash,
+            watermark: RecordingWatermark(sessionID: sessionID, role: .a)
+        )
+        defer {
+            EvidenceCryptor.remove(video)
+            try? DraftStore.clearStaging(sessionID: sessionID)
+        }
+
+        try DraftStore.saveStaging(
+            sessionID: sessionID,
+            role: .a,
+            segmentURL: video,
+            manifest: manifest,
+            vaultPassword: password
+        )
+        let metadataURL = AppFiles.stagingURL.appendingPathComponent("\(sessionID.uuidString).json")
+        let record = try JSONDecoder().decode(
+            DraftStore.StagingRecord.self,
+            from: Data(contentsOf: metadataURL)
+        )
+        let tamperedManifest = SegmentManifest(
+            role: record.manifest.role,
+            duration: record.manifest.duration + 1,
+            sha256: record.manifest.sha256,
+            watermark: record.manifest.watermark
+        )
+        let tamperedRecord = DraftStore.StagingRecord(
+            sessionID: record.sessionID,
+            role: record.role,
+            expiresAt: record.expiresAt,
+            manifest: tamperedManifest,
+            fileName: record.fileName
+        )
+        try JSONEncoder().encode(tamperedRecord).write(to: metadataURL, options: .atomic)
+
+        XCTAssertThrowsError(
+            try DraftStore.loadStaging(sessionID: sessionID, vaultPassword: password)
+        ) { error in
+            XCTAssertEqual(error as? EvidenceCryptoError, .tamperedPackage)
+        }
+    }
+
+    func testCorruptDraftIndexDoesNotDeleteSourcePackage() throws {
+        let source = try makeSampleVideoData()
+        defer {
+            EvidenceCryptor.remove(source)
+            try? AppFiles.removeItemIfExists(AppFiles.draftsIndexURL)
+            try? AppFiles.clearDirectory(AppFiles.draftsURL)
+        }
+        try Data("not-json".utf8).write(to: AppFiles.draftsIndexURL, options: .atomic)
+
+        XCTAssertThrowsError(
+            try DraftStore.saveExportDraft(from: source, mode: .single)
+        ) { error in
+            XCTAssertEqual(error as? DraftStoreError, .corruptIndex)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertTrue(DraftStore.listDrafts().isEmpty)
+    }
+
     func testUnsupportedVersionRejectedViaCorruptMagic() throws {
         let video = try makeSampleVideoData()
         defer { EvidenceCryptor.remove(video) }

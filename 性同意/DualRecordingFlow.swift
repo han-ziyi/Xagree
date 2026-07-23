@@ -184,17 +184,26 @@ final class DualSessionModel: ObservableObject {
         }
         if localSegment == nil {
             let sessionID = coordinator.currentSessionID ?? DraftStore.activeStagingSessionID()
-            guard let sessionID,
-                  !vaultPasswordForStaging.isEmpty,
-                  let restored = try? DraftStore.loadStaging(
-                    sessionID: sessionID,
-                    vaultPassword: vaultPasswordForStaging
-                  ) else {
+            guard let sessionID, !vaultPasswordForStaging.isEmpty else {
                 error = AppError(title: "无法恢复", detail: "没有可用的暂存片段，请重新录制。")
                 stage = .ready
                 return
             }
-            localSegment = LocalSegment(url: restored.url, manifest: restored.manifest)
+            do {
+                guard let restored = try DraftStore.loadStaging(
+                    sessionID: sessionID,
+                    vaultPassword: vaultPasswordForStaging
+                ) else {
+                    error = AppError(title: "无法恢复", detail: "没有可用的暂存片段，请重新录制。")
+                    stage = .ready
+                    return
+                }
+                localSegment = LocalSegment(url: restored.url, manifest: restored.manifest)
+            } catch {
+                self.error = AppError(title: "无法恢复", detail: error.localizedDescription)
+                stage = .ready
+                return
+            }
         }
         guard let local = localSegment,
               FileManager.default.fileExists(atPath: local.url.path) else {
@@ -283,7 +292,11 @@ final class DualSessionModel: ObservableObject {
         if let url = encryptedPackageURL {
             if url.path.contains("/Drafts/") {
                 for draft in DraftStore.listDrafts() where DraftStore.draftURL(for: draft).path == url.path {
-                    try? DraftStore.deleteDraft(draft)
+                    do {
+                        try DraftStore.deleteDraft(draft)
+                    } catch {
+                        self.error = AppError(title: "无法清理草稿", detail: error.localizedDescription)
+                    }
                 }
             }
             EvidenceCryptor.remove(url)
@@ -296,11 +309,15 @@ final class DualSessionModel: ObservableObject {
     func cancelExport(saveDraft: Bool) {
         guard let url = encryptedPackageURL else { return }
         if saveDraft {
-            if let draft = try? DraftStore.saveExportDraft(from: url, mode: .dual) {
+            do {
+                let draft = try DraftStore.saveExportDraft(from: url, mode: .dual)
                 if url.path != DraftStore.draftURL(for: draft).path {
                     EvidenceCryptor.remove(url)
                 }
                 encryptedPackageURL = DraftStore.draftURL(for: draft)
+                return
+            } catch {
+                self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
                 return
             }
         }
@@ -322,8 +339,12 @@ final class DualSessionModel: ObservableObject {
         if let encryptedPackageURL {
             let isDraft = encryptedPackageURL.path.contains("/Drafts/")
             if !isDraft {
-                _ = try? DraftStore.saveExportDraft(from: encryptedPackageURL, mode: .dual)
-                EvidenceCryptor.remove(encryptedPackageURL)
+                do {
+                    _ = try DraftStore.saveExportDraft(from: encryptedPackageURL, mode: .dual)
+                    EvidenceCryptor.remove(encryptedPackageURL)
+                } catch {
+                    self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
+                }
             }
         }
         finalVideoURL = nil

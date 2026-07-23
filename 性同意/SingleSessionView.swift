@@ -166,7 +166,11 @@ final class SingleSessionModel: ObservableObject {
             // 若指向草稿目录，同步删草稿索引
             if url.path.contains("/Drafts/") {
                 for draft in DraftStore.listDrafts() where DraftStore.draftURL(for: draft).path == url.path {
-                    try? DraftStore.deleteDraft(draft)
+                    do {
+                        try DraftStore.deleteDraft(draft)
+                    } catch {
+                        self.error = AppError(title: "无法清理草稿", detail: error.localizedDescription)
+                    }
                 }
             }
             EvidenceCryptor.remove(url)
@@ -179,12 +183,16 @@ final class SingleSessionModel: ObservableObject {
     func cancelExport(saveDraft: Bool) {
         guard let url = encryptedPackageURL else { return }
         if saveDraft {
-            if let draft = try? DraftStore.saveExportDraft(from: url, mode: .single) {
+            do {
+                let draft = try DraftStore.saveExportDraft(from: url, mode: .single)
                 // 删除临时包，但保留草稿路径以便“重新打开保存器”
                 if url.path != DraftStore.draftURL(for: draft).path {
                     EvidenceCryptor.remove(url)
                 }
                 encryptedPackageURL = DraftStore.draftURL(for: draft)
+                return
+            } catch {
+                self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
                 return
             }
         }
@@ -197,8 +205,12 @@ final class SingleSessionModel: ObservableObject {
         if let encryptedPackageURL {
             let isDraft = encryptedPackageURL.path.contains("/Drafts/")
             if !isDraft {
-                _ = try? DraftStore.saveExportDraft(from: encryptedPackageURL, mode: .single)
-                EvidenceCryptor.remove(encryptedPackageURL)
+                do {
+                    _ = try DraftStore.saveExportDraft(from: encryptedPackageURL, mode: .single)
+                    EvidenceCryptor.remove(encryptedPackageURL)
+                } catch {
+                    self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
+                }
             }
         }
         clearWorkingMedia(keepEncryptedPackage: false)
