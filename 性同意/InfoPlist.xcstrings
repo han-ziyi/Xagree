@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Together" } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ふたりの記録" } }
+      }
+    },
+    "NSCameraUsageDescription" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Used to record your own video for a shared private record. It is not uploaded to the developer." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ふたりのプライベートな記録のために、ご自身の動画を撮影します。開発者にはアップロードしません。" } }
+      }
+    },
+    "NSLocalNetworkUsageDescription" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Used to transfer encrypted video directly between two nearby devices without the developer's servers." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "開発者のサーバーを使わず、近くの2台のデバイス間で暗号化動画を直接転送します。" } }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Used to include your voice in your private video record. It is not uploaded to the developer." } },
+        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プライベートな動画記録に音声を含めるために使用します。開発者にはアップロードしません。" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

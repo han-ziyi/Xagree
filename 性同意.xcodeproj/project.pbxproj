@@ -6,8 +6,34 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A1B2C3D43011AA0800TEST0D /* EvidenceCryptoTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D43011AA0800TEST0C /* EvidenceCryptoTests.swift */; };
+		B2C3D4E53011AA0800UI00D /* OnboardingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E53011AA0800UI00C /* OnboardingUITests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A1B2C3D43011AA0800TEST08 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 335A763E3011AA0800B66F79 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 335A76453011AA0800B66F79;
+			remoteInfo = "性同意";
+		};
+		B2C3D4E53011AA0800UI008 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 335A763E3011AA0800B66F79 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 335A76453011AA0800B66F79;
+			remoteInfo = "性同意";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		335A76463011AA0800B66F79 /* 性同意.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "性同意.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D43011AA0800TEST01 /* XAgreeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XAgreeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D43011AA0800TEST0C /* EvidenceCryptoTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EvidenceCryptoTests.swift; sourceTree = "<group>"; };
+		B2C3D4E53011AA0800UI001 /* XAgreeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = XAgreeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2C3D4E53011AA0800UI00C /* OnboardingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -26,6 +52,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1B2C3D43011AA0800TEST04 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B2C3D4E53011AA0800UI004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -33,6 +73,8 @@
 			isa = PBXGroup;
 			children = (
 				335A76483011AA0800B66F79 /* 性同意 */,
+				A1B2C3D43011AA0800TEST06 /* XAgreeTests */,
+				B2C3D4E53011AA0800UI006 /* XAgreeUITests */,
 				335A76473011AA0800B66F79 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,8 +83,26 @@
 			isa = PBXGroup;
 			children = (
 				335A76463011AA0800B66F79 /* 性同意.app */,
+				A1B2C3D43011AA0800TEST01 /* XAgreeTests.xctest */,
+				B2C3D4E53011AA0800UI001 /* XAgreeUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A1B2C3D43011AA0800TEST06 /* XAgreeTests */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D43011AA0800TEST0C /* EvidenceCryptoTests.swift */,
+			);
+			path = XAgreeTests;
+			sourceTree = "<group>";
+		};
+		B2C3D4E53011AA0800UI006 /* XAgreeUITests */ = {
+			isa = PBXGroup;
+			children = (
+				B2C3D4E53011AA0800UI00C /* OnboardingUITests.swift */,
+			);
+			path = XAgreeUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -70,6 +130,46 @@
 			productReference = 335A76463011AA0800B66F79 /* 性同意.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A1B2C3D43011AA0800TEST02 /* XAgreeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1B2C3D43011AA0800TEST09 /* Build configuration list for PBXNativeTarget "XAgreeTests" */;
+			buildPhases = (
+				A1B2C3D43011AA0800TEST03 /* Sources */,
+				A1B2C3D43011AA0800TEST04 /* Frameworks */,
+				A1B2C3D43011AA0800TEST05 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1B2C3D43011AA0800TEST07 /* PBXTargetDependency */,
+			);
+			name = XAgreeTests;
+			packageProductDependencies = (
+			);
+			productName = XAgreeTests;
+			productReference = A1B2C3D43011AA0800TEST01 /* XAgreeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		B2C3D4E53011AA0800UI002 /* XAgreeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B2C3D4E53011AA0800UI009 /* Build configuration list for PBXNativeTarget "XAgreeUITests" */;
+			buildPhases = (
+				B2C3D4E53011AA0800UI003 /* Sources */,
+				B2C3D4E53011AA0800UI004 /* Frameworks */,
+				B2C3D4E53011AA0800UI005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B2C3D4E53011AA0800UI007 /* PBXTargetDependency */,
+			);
+			name = XAgreeUITests;
+			packageProductDependencies = (
+			);
+			productName = XAgreeUITests;
+			productReference = B2C3D4E53011AA0800UI001 /* XAgreeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -83,13 +183,23 @@
 					335A76453011AA0800B66F79 = {
 						CreatedOnToolsVersion = 26.6;
 					};
+					A1B2C3D43011AA0800TEST02 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 335A76453011AA0800B66F79;
+					};
+					B2C3D4E53011AA0800UI002 = {
+						CreatedOnToolsVersion = 26.6;
+						TestTargetID = 335A76453011AA0800B66F79;
+					};
 				};
 			};
 			buildConfigurationList = 335A76413011AA0800B66F79 /* Build configuration list for PBXProject "性同意" */;
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				ja,
+				"zh-Hans",
 				Base,
 			);
 			mainGroup = 335A763D3011AA0800B66F79;
@@ -100,12 +210,28 @@
 			projectRoot = "";
 			targets = (
 				335A76453011AA0800B66F79 /* 性同意 */,
+				A1B2C3D43011AA0800TEST02 /* XAgreeTests */,
+				B2C3D4E53011AA0800UI002 /* XAgreeUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		335A76443011AA0800B66F79 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B2C3D43011AA0800TEST05 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B2C3D4E53011AA0800UI005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +248,36 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1B2C3D43011AA0800TEST03 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D43011AA0800TEST0D /* EvidenceCryptoTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B2C3D4E53011AA0800UI003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B2C3D4E53011AA0800UI00D /* OnboardingUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A1B2C3D43011AA0800TEST07 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 335A76453011AA0800B66F79 /* 性同意 */;
+			targetProxy = A1B2C3D43011AA0800TEST08 /* PBXContainerItemProxy */;
+		};
+		B2C3D4E53011AA0800UI007 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 335A76453011AA0800B66F79 /* 性同意 */;
+			targetProxy = B2C3D4E53011AA0800UI008 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		335A764F3011AA0900B66F79 /* Debug */ = {
@@ -248,8 +403,14 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "XAgree-Info.plist";
+				INFOPLIST_KEY_NSBonjourServices = "_xagree-v1._tcp";
+				INFOPLIST_KEY_NSCameraUsageDescription = "用于录制双方明确知情的自拍视频，不会上传给开发者。";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "用于在附近两台设备之间直接传输加密的视频副本，不通过开发者服务器。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于录制声明视频中的语音，不会上传给开发者。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -258,26 +419,25 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.hanziyi.---";
+				PRODUCT_BUNDLE_IDENTIFIER = com.hanziyi.xagree;
+				PRODUCT_MODULE_NAME = XAgree;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
@@ -290,8 +450,14 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "XAgree-Info.plist";
+				INFOPLIST_KEY_NSBonjourServices = "_xagree-v1._tcp";
+				INFOPLIST_KEY_NSCameraUsageDescription = "用于录制双方明确知情的自拍视频，不会上传给开发者。";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "用于在附近两台设备之间直接传输加密的视频副本，不通过开发者服务器。";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于录制声明视频中的语音，不会上传给开发者。";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -300,26 +466,121 @@
 				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.hanziyi.---";
+				PRODUCT_BUNDLE_IDENTIFIER = com.hanziyi.xagree;
+				PRODUCT_MODULE_NAME = XAgree;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
-				XROS_DEPLOYMENT_TARGET = 26.5;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A1B2C3D43011AA0800TEST0A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hanziyi.xagree.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/性同意.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/性同意";
+			};
+			name = Debug;
+		};
+		A1B2C3D43011AA0800TEST0B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hanziyi.xagree.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/性同意.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/性同意";
+			};
+			name = Release;
+		};
+		B2C3D4E53011AA0800UI00A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hanziyi.xagree.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "性同意";
+			};
+			name = Debug;
+		};
+		B2C3D4E53011AA0800UI00B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.hanziyi.xagree.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = "性同意";
 			};
 			name = Release;
 		};
@@ -340,6 +601,24 @@
 			buildConfigurations = (
 				335A76523011AA0900B66F79 /* Debug */,
 				335A76533011AA0900B66F79 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1B2C3D43011AA0800TEST09 /* Build configuration list for PBXNativeTarget "XAgreeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3D43011AA0800TEST0A /* Debug */,
+				A1B2C3D43011AA0800TEST0B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		B2C3D4E53011AA0800UI009 /* Build configuration list for PBXNativeTarget "XAgreeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2C3D4E53011AA0800UI00A /* Debug */,
+				B2C3D4E53011AA0800UI00B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
