@@ -2,27 +2,111 @@
   "sourceLanguage" : "zh-Hans",
   "strings" : {
     "CFBundleDisplayName" : {
+      "comment" : "Bundle display name",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Together" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ふたりの記録" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "同意爱"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "同意爱"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "同意爱"
+          }
+        }
+      }
+    },
+    "CFBundleName" : {
+      "comment" : "Bundle name",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "同意爱"
+          }
+        }
       }
     },
     "NSCameraUsageDescription" : {
+      "comment" : "Privacy - Camera Usage Description",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Used to record your own video for a shared private record. It is not uploaded to the developer." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "ふたりのプライベートな記録のために、ご自身の動画を撮影します。開発者にはアップロードしません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Used to record your own video for a shared private record. It is not uploaded to the developer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "ふたりのプライベートな記録のために、ご自身の動画を撮影します。開発者にはアップロードしません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "用于录制双方明确知情的自拍视频，不会上传给开发者。"
+          }
+        }
       }
     },
     "NSLocalNetworkUsageDescription" : {
+      "comment" : "Privacy - Local Network Usage Description",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Used to transfer encrypted video directly between two nearby devices without the developer's servers." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "開発者のサーバーを使わず、近くの2台のデバイス間で暗号化動画を直接転送します。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Used to transfer encrypted video directly between two nearby devices without the developer's servers."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "開発者のサーバーを使わず、近くの2台のデバイス間で暗号化動画を直接転送します。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "用于在附近两台设备之间直接传输加密的视频副本，不通过开发者服务器。"
+          }
+        }
       }
     },
     "NSMicrophoneUsageDescription" : {
+      "comment" : "Privacy - Microphone Usage Description",
+      "extractionState" : "extracted_with_value",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Used to include your voice in your private video record. It is not uploaded to the developer." } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "プライベートな動画記録に音声を含めるために使用します。開発者にはアップロードしません。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Used to include your voice in your private video record. It is not uploaded to the developer."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "プライベートな動画記録に音声を含めるために使用します。開発者にはアップロードしません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "用于录制声明视频中的语音，不会上传给开发者。"
+          }
+        }
       }
     }
   },

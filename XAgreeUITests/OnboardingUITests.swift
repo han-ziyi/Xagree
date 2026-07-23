@@ -107,9 +107,9 @@ final class OnboardingUITests: XCTestCase {
         }
     }
 
-    private func launchSkipToHome() {
+    private func launchSkipToHome(extraArguments: [String] = []) {
         app.terminate()
-        app.launchArguments = ["-UITesting", "-UITestingReset", "-UITestingSkipToHome"]
+        app.launchArguments = ["-UITesting", "-UITestingReset", "-UITestingSkipToHome"] + extraArguments
         app.launch()
         XCTAssertTrue(
             app.navigationBars["我们的记录"].waitForExistence(timeout: 10),
@@ -131,6 +131,25 @@ final class OnboardingUITests: XCTestCase {
     }
 
     // MARK: - Tests
+
+    func testVaultSetupShowsPasswordValidationFeedback() throws {
+        prepareApp()
+        waitTap("onboarding.privacy.continue")
+        enableSwitch("onboarding.adult.toggle")
+        waitEnabledTap("onboarding.adult.continue")
+
+        typeInto("vault.setup.password", text: "abc1234-")
+        XCTAssertTrue(
+            element("password.validation.format").waitForExistence(timeout: 3),
+            "invalid password should show an inline explanation"
+        )
+
+        typeInto("vault.setup.confirm", text: "abc12345")
+        XCTAssertTrue(
+            element("password.validation.confirmation").waitForExistence(timeout: 3),
+            "mismatched passwords should show an inline explanation"
+        )
+    }
 
     func testOnboardingToHomeFlow() throws {
         prepareApp()
@@ -154,8 +173,8 @@ final class OnboardingUITests: XCTestCase {
                 || app.navigationBars["欢迎使用"].waitForExistence(timeout: 2),
             "should reach vault setup"
         )
-        typeInto("vault.setup.password", text: "ui-test-password-12")
-        typeInto("vault.setup.confirm", text: "ui-test-password-12")
+        typeInto("vault.setup.password", text: "uiTestPassword12")
+        typeInto("vault.setup.confirm", text: "uiTestPassword12")
         if element("vault.setup.hint").exists {
             typeInto("vault.setup.hint", text: "uitest")
         }
@@ -175,7 +194,17 @@ final class OnboardingUITests: XCTestCase {
             app.navigationBars["姓名与头像"].waitForExistence(timeout: 6)
                 || app.staticTexts["个人资料"].waitForExistence(timeout: 2)
         )
-        typeInto("profile.name", text: "测试用户")
+        // 使用 ASCII 姓名，避免模拟器中文输入法影响资料保存断言。
+        typeInto("profile.name", text: "Test User")
+        if app.keyboards.element(boundBy: 0).exists {
+            for key in ["return", "Return", "Done", "完成"] {
+                let returnKey = app.keyboards.buttons[key]
+                if returnKey.exists {
+                    returnKey.tap()
+                    break
+                }
+            }
+        }
         waitTap("profile.save")
 
         // 保存方式
@@ -238,6 +267,54 @@ final class OnboardingUITests: XCTestCase {
         enableSwitch("consent.accept")
         XCTAssertTrue(element("consent.start").waitForExistence(timeout: 3))
         waitEnabledTap("consent.start")
+    }
+
+    func testSingleSessionKeyboardDismissesAndConsentFitsScreen() throws {
+        prepareApp()
+        launchSkipToHome()
+
+        waitTap("home.single")
+        typeInto("single.nameA", text: "Alice")
+        typeInto("single.nameB", text: "Bob")
+        element("single.nameB").typeText("\n")
+
+        let keyboardDeadline = Date().addingTimeInterval(2)
+        while app.keyboards.count > 0 && Date() < keyboardDeadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        XCTAssertEqual(app.keyboards.count, 0, "the Done key should dismiss the name-entry keyboard")
+
+        waitTap("single.start")
+        let statement = element("consent.statement")
+        XCTAssertTrue(statement.waitForExistence(timeout: 5))
+        let windowFrame = app.windows.firstMatch.frame
+        XCTAssertGreaterThanOrEqual(statement.frame.minX, windowFrame.minX)
+        XCTAssertLessThanOrEqual(statement.frame.maxX, windowFrame.maxX)
+        XCTAssertGreaterThan(statement.frame.height, 80, "the statement should expand vertically instead of clipping")
+    }
+
+    func testVaultPasswordCanBeFilledWithOneTap() throws {
+        prepareApp()
+        launchSkipToHome(extraArguments: ["-UITestingSingleProtect"])
+
+        waitTap("home.single")
+        XCTAssertTrue(element("encryption.method.vault").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("encryption.method.oneTime").exists)
+        XCTAssertFalse(app.staticTexts["方式"].exists)
+
+        waitTap("encryption.autofillVault")
+        XCTAssertEqual(element("encryption.autofillVault").label, "总密码已填入")
+        XCTAssertTrue(element("encryption.encrypt").isEnabled)
+    }
+
+    func testCompletionCanReturnHome() throws {
+        prepareApp()
+        launchSkipToHome(extraArguments: ["-UITestingSingleCompletion"])
+
+        waitTap("home.single")
+        XCTAssertTrue(app.navigationBars["完成"].waitForExistence(timeout: 5))
+        waitTap("completion.home")
+        XCTAssertTrue(app.navigationBars["我们的记录"].waitForExistence(timeout: 5))
     }
 
     func testHomeLockReturnsToUnlock() throws {

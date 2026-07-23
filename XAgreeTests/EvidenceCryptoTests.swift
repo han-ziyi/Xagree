@@ -3,6 +3,24 @@ import XCTest
 
 @MainActor
 final class EvidenceCryptoTests: XCTestCase {
+    func testRecordingWatermarkUsesCurrentTimeAndStableTwoLineLayout() {
+        let recordedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let watermark = RecordingWatermark(
+            sessionID: UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!,
+            role: .a,
+            recordedAt: recordedAt,
+            status: "REC"
+        )
+
+        let first = watermark.displayText(at: recordedAt)
+        let next = watermark.displayText(at: recordedAt.addingTimeInterval(1))
+
+        XCTAssertNotEqual(first, next)
+        XCTAssertEqual(first.split(separator: "\n").count, 2)
+        XCTAssertTrue(first.contains("12345678"))
+        XCTAssertTrue(first.contains("REC"))
+    }
+
     func testSealOpenRoundTrip() throws {
         let video = try makeSampleVideoData()
         let manifest = sampleManifest(hash: try FileHasher.sha256Hex(of: video))
@@ -341,6 +359,21 @@ final class PeerPairingTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? PeerPairingError, .recoverySessionMismatch)
         }
+    }
+}
+
+@MainActor
+final class PasswordPolicyTests: XCTestCase {
+    func testAcceptsEightOrMoreASCIIAlphanumericCharacters() {
+        XCTAssertTrue(PasswordPolicy.isValid("12345678"))
+        XCTAssertTrue(PasswordPolicy.isValid("abcdefgh"))
+        XCTAssertTrue(PasswordPolicy.isValid("abc12345"))
+    }
+
+    func testRejectsShortPasswordsAndUnsupportedCharacters() {
+        XCTAssertEqual(PasswordPolicy.validationIssue(for: "abc1234"), .tooShort)
+        XCTAssertEqual(PasswordPolicy.validationIssue(for: "abc1234!"), .invalidCharacters)
+        XCTAssertEqual(PasswordPolicy.validationIssue(for: "密码abc12345"), .invalidCharacters)
     }
 }
 

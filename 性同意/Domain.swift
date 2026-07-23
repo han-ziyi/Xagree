@@ -1,5 +1,37 @@
 import Foundation
 
+enum PasswordPolicy {
+    enum ValidationIssue: Equatable {
+        case tooShort
+        case invalidCharacters
+    }
+
+    static let minimumLength = 8
+
+    static func validationIssue(for password: String) -> ValidationIssue? {
+        guard password.count >= minimumLength else { return .tooShort }
+        guard password.unicodeScalars.allSatisfy({ $0.isASCIIAlphanumeric }) else {
+            return .invalidCharacters
+        }
+        return nil
+    }
+
+    static func isValid(_ password: String) -> Bool {
+        validationIssue(for: password) == nil
+    }
+}
+
+private extension Unicode.Scalar {
+    var isASCIIAlphanumeric: Bool {
+        switch value {
+        case 48...57, 65...90, 97...122:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 struct ParticipantProfile: Codable, Equatable, Sendable {
     var name: String
     var avatarData: Data?
@@ -97,12 +129,17 @@ struct RecordingWatermark: Codable, Sendable, Equatable {
         self.status = status
     }
 
-    var displayText: String {
+    nonisolated var displayText: String {
+        displayText(at: recordedAt)
+    }
+
+    nonisolated func displayText(at date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
+        formatter.calendar = Calendar(identifier: .gregorian)
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         let shortID = String(sessionID.uuidString.prefix(8))
-        return "\(formatter.string(from: recordedAt))  ·  \(role.rawValue)  ·  \(shortID)  ·  \(status)"
+        return "\(formatter.string(from: date))  ·  \(role.rawValue)\n\(shortID)  ·  \(status)"
     }
 }
 

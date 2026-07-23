@@ -34,6 +34,13 @@ final class SingleSessionModel: ObservableObject {
     init(owner: ParticipantProfile) {
         self.owner = owner
         participantA = owner.trimmedName
+        if UITestBootstrap.shouldShowSingleProtect {
+            stage = .protect
+            sessionPhase = .assembling
+        } else if UITestBootstrap.shouldShowSingleCompletion {
+            stage = .complete
+            sessionPhase = .completed
+        }
     }
 
     func start() throws {
@@ -320,6 +327,12 @@ struct SingleSessionView: View {
 
 private struct SingleDetailsView: View {
     @ObservedObject var model: SingleSessionModel
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable {
+        case participantA
+        case participantB
+    }
 
     var body: some View {
         Form {
@@ -330,9 +343,15 @@ private struct SingleDetailsView: View {
             Section("你们的名字") {
                 TextField("参与者 A 姓名", text: $model.participantA)
                     .textContentType(.name)
+                    .focused($focusedField, equals: .participantA)
+                    .submitLabel(.next)
+                    .onSubmit { focusedField = .participantB }
                     .accessibilityIdentifier(AccessibilityID.singleNameA)
                 TextField("参与者 B 姓名", text: $model.participantB)
                     .textContentType(.name)
+                    .focused($focusedField, equals: .participantB)
+                    .submitLabel(.done)
+                    .onSubmit { focusedField = nil }
                     .accessibilityIdentifier(AccessibilityID.singleNameB)
             }
             Section("接下来会发生什么") {
@@ -341,24 +360,36 @@ private struct SingleDetailsView: View {
                 Label("画面会留下时间、角色和短会话号", systemImage: "text.viewfinder")
                 Label("结束后按 A → B 合成为一段视频", systemImage: "arrow.right.arrow.left")
             }
-            Section {
-                Button {
-                    do {
-                        try model.start()
-                    } catch {
-                        model.error = AppError(title: "无法开始", detail: error.localizedDescription)
-                    }
-                } label: {
-                    Label("先从参与者 A 开始", systemImage: "arrow.right.circle.fill")
-                }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier(AccessibilityID.singleStart)
-            }
         }
         .appReadableWidth()
         .navigationTitle("同机记录")
         .appScreenBackground()
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                focusedField = nil
+                do {
+                    try model.start()
+                } catch {
+                    model.error = AppError(title: "无法开始", detail: error.localizedDescription)
+                }
+            } label: {
+                Label("先从参与者 A 开始", systemImage: "arrow.right.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .background(.bar)
+            .accessibilityIdentifier(AccessibilityID.singleStart)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("完成") { focusedField = nil }
+            }
+        }
     }
 }
 
@@ -377,16 +408,18 @@ private struct ConsentView: View {
                     .font(.title2.bold())
                 Text("请把手机交给 \(participantName)，由本人读完并亲自开始。")
                     .foregroundStyle(.secondary)
-                Text("我是 \(participantName)。我已经成年，也愿意在此刻与 \(otherName) 亲密相处。我知道自己可以在录制前停下来，或者重新确认后再继续。")
-                    .font(.title3)
-                    .padding()
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "quote.opening")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(AppTheme.accent)
+                        .accessibilityHidden(true)
+                    Text("我是 \(participantName)。我已经成年，也愿意在此刻与 \(otherName) 亲密相处。我知道自己可以在录制前停下来，或者重新确认后再继续。")
+                        .font(.title3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                    .accessibilityIdentifier(AccessibilityID.consentStatement)
+                    .padding(16)
                     .background(AppTheme.accentSoft, in: RoundedRectangle(cornerRadius: 18))
-                    .overlay(alignment: .topLeading) {
-                        Image(systemName: "quote.opening")
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(AppTheme.accent)
-                            .padding(14)
-                    }
                 Toggle("我已阅读并理解以上说明", isOn: $accepted)
                     .accessibilityIdentifier(AccessibilityID.consentAccept)
                 Button("本人开始录制") {
@@ -466,11 +499,7 @@ private struct RecordingView: View {
                 }
 
                 if let watermark {
-                    Text(watermark.displayText)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 6))
+                    LiveRecordingWatermarkView(watermark: watermark)
                         .padding(.horizontal)
                 }
 
@@ -548,18 +577,52 @@ struct ProcessingView: View {
     }
 }
 
+enum EncryptionMethod: String, CaseIterable, Identifiable {
+    case vault
+    case oneTime
+
+    var id: String { rawValue }
+}
+
+struct EncryptionMethodSections: View {
+    @Binding var selection: EncryptionMethod
+
+    var body: some View {
+        Section("加密方式") {
+            methodButton(.vault)
+        }
+        Section {
+            methodButton(.oneTime)
+        }
+    }
+
+    private func methodButton(_ method: EncryptionMethod) -> some View {
+        Button {
+            selection = method
+        } label: {
+            HStack {
+                Text(method == .vault ? "使用私密空间密码" : "设置一次性密码")
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                if selection == method {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(AppTheme.accent)
+                        .fontWeight(.semibold)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(method == .vault ? AccessibilityID.encryptionVault : AccessibilityID.encryptionOneTime)
+    }
+}
+
 private struct ProtectEvidenceView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var model: SingleSessionModel
-    @State private var method: PasswordMethod = .vault
+    @State private var method: EncryptionMethod = .vault
     @State private var password = ""
     @State private var confirmation = ""
-
-    enum PasswordMethod: String, CaseIterable, Identifiable {
-        case vault
-        case oneTime
-        var id: String { rawValue }
-    }
 
     var body: some View {
         Form {
@@ -567,20 +630,19 @@ private struct ProtectEvidenceView: View {
                 Text("视频已合成为一条带水印的成片。现在对它加密，明文成片将在加密成功后删除。")
                     .foregroundStyle(.secondary)
             }
-            Section("加密方式") {
-                Picker("方式", selection: $method) {
-                    Text("使用私密空间密码").tag(PasswordMethod.vault)
-                    Text("设置一次性密码").tag(PasswordMethod.oneTime)
-                }
-                .pickerStyle(.inline)
-            }
-            Section(method == .vault ? L10n.string("确认私密空间密码") : L10n.string("一次性密码")) {
-                SecureField(
-                    method == .vault ? L10n.string("输入当前私密空间密码") : L10n.string("至少 12 个字符"),
-                    text: $password
-                )
-                if method == .oneTime {
+            EncryptionMethodSections(selection: $method)
+            Section(method == .vault ? L10n.string("私密空间密码") : L10n.string("一次性密码")) {
+                if method == .vault {
+                    Button {
+                        password = appState.activePassword
+                    } label: {
+                        Label(password.isEmpty ? "一键填入总密码" : "总密码已填入", systemImage: password.isEmpty ? "key.fill" : "checkmark.circle.fill")
+                    }
+                    .accessibilityIdentifier(AccessibilityID.encryptionAutofillVault)
+                } else {
+                    SecureField(L10n.string("至少 8 位，只能包含数字或英文字母"), text: $password)
                     SecureField("再次输入一次性密码", text: $confirmation)
+                    PasswordValidationFeedback(password: password, confirmation: confirmation)
                     Text("一次性密码不会保存在应用中，请自行妥善保管。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -595,12 +657,17 @@ private struct ProtectEvidenceView: View {
                     Task { await model.encrypt(password: password) }
                 }
                 .frame(maxWidth: .infinity)
-                .disabled(password.isEmpty || (method == .oneTime && (password.count < 12 || password != confirmation)))
+                .disabled(password.isEmpty || (method == .oneTime && (!PasswordPolicy.isValid(password) || password != confirmation)))
+                .accessibilityIdentifier(AccessibilityID.encryptionEncrypt)
             }
         }
         .appReadableWidth()
         .navigationTitle("加密记录")
         .appScreenBackground()
+        .onChange(of: method) { _, _ in
+            password.removeAll()
+            confirmation.removeAll()
+        }
     }
 }
 
@@ -641,19 +708,33 @@ private struct ExportEvidenceView: View {
 }
 
 private struct CompletionView: View {
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        VStack(spacing: 18) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(.green)
-            Text("加密文件已交给系统保存")
-                .font(.title2.bold())
-            Text("请妥善保管密码。应用已删除本次工作文件中的明文视频；成功导出的加密包默认不在应用内保留副本。")
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(spacing: 18) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 56))
+                    .foregroundStyle(.green)
+                Text("加密文件已交给系统保存")
+                    .font(.title2.bold())
+                Text("请妥善保管密码。应用已删除本次工作文件中的明文视频；成功导出的加密包默认不在应用内保留副本。")
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                Button {
+                    dismiss()
+                } label: {
+                    Label("返回首页", systemImage: "house.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityIdentifier(AccessibilityID.completionHome)
+            }
+            .frame(maxWidth: 680)
+            .padding(28)
+            .frame(maxWidth: .infinity, minHeight: 420)
         }
-        .padding(28)
+        .appScreenBackground()
         .navigationTitle("完成")
-        .navigationBarBackButtonHidden()
     }
 }

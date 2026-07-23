@@ -31,6 +31,35 @@ extension View {
     }
 }
 
+struct PasswordValidationFeedback: View {
+    let password: String
+    var confirmation: String?
+
+    var body: some View {
+        if !password.isEmpty, let issue = PasswordPolicy.validationIssue(for: password) {
+            Label(message(for: issue), systemImage: "exclamationmark.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier("password.validation.format")
+        }
+        if let confirmation, !confirmation.isEmpty, password != confirmation {
+            Label("两次输入的密码不一致。", systemImage: "exclamationmark.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .accessibilityIdentifier("password.validation.confirmation")
+        }
+    }
+
+    private func message(for issue: PasswordPolicy.ValidationIssue) -> String {
+        switch issue {
+        case .tooShort:
+            L10n.string("密码至少需要 8 位。")
+        case .invalidCharacters:
+            L10n.string("密码只能包含数字或英文字母。")
+        }
+    }
+}
+
 struct AppRootView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.scenePhase) private var scenePhase
@@ -90,7 +119,7 @@ struct OnboardingPrivacyView: View {
                         Text("把这一刻，留给彼此")
                             .font(.largeTitle.bold())
                             .multilineTextAlignment(.center)
-                        Text("相伴记录帮助你们当面表达、彼此确认，再把共同的记录留在自己选择的地方。")
+                        Text("同意爱帮助你们当面表达、彼此确认，再把共同的记录留在自己选择的地方。")
                             .font(.title3)
                             .foregroundStyle(AppTheme.mutedInk)
                             .multilineTextAlignment(.center)
@@ -233,12 +262,13 @@ struct VaultSetupView: View {
                 }
 
                 Section("密码") {
-                    SecureField("至少 12 个字符（区分大小写与空格）", text: $password)
+                    SecureField("至少 8 位，只能包含数字或英文字母", text: $password)
                         .textContentType(.newPassword)
                         .accessibilityIdentifier(AccessibilityID.vaultPassword)
                     SecureField("再次输入密码", text: $confirmation)
                         .textContentType(.newPassword)
                         .accessibilityIdentifier(AccessibilityID.vaultConfirm)
+                    PasswordValidationFeedback(password: password, confirmation: confirmation)
                     TextField("辅助记忆提示词（可选，最多 60 字）", text: $hint, axis: .vertical)
                         .lineLimit(1...3)
                         .accessibilityIdentifier(AccessibilityID.vaultHint)
@@ -271,7 +301,7 @@ struct VaultSetupView: View {
                     .frame(maxWidth: .infinity)
                     .disabled(
                         password != confirmation
-                            || password.count < 12
+                            || !PasswordPolicy.isValid(password)
                             || !acceptedNotice
                             || !hintCountOK
                     )

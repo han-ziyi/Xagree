@@ -5,6 +5,8 @@ enum UITestBootstrap {
     static let testingFlag = "-UITesting"
     static let resetFlag = "-UITestingReset"
     static let skipToHomeFlag = "-UITestingSkipToHome"
+    static let singleProtectFlag = "-UITestingSingleProtect"
+    static let singleCompletionFlag = "-UITestingSingleCompletion"
 
     static var isUITesting: Bool {
         ProcessInfo.processInfo.arguments.contains(testingFlag)
@@ -16,6 +18,14 @@ enum UITestBootstrap {
 
     static var shouldSkipToHome: Bool {
         ProcessInfo.processInfo.arguments.contains(skipToHomeFlag)
+    }
+
+    static var shouldShowSingleProtect: Bool {
+        isUITesting && ProcessInfo.processInfo.arguments.contains(singleProtectFlag)
+    }
+
+    static var shouldShowSingleCompletion: Bool {
+        isUITesting && ProcessInfo.processInfo.arguments.contains(singleCompletionFlag)
     }
 
     /// 在 App 初始化最早阶段调用：清状态或预置可进入首页的私密空间。
@@ -51,7 +61,7 @@ enum UITestBootstrap {
 }
 
 enum UITestCredentials {
-    static let password = "ui-test-password-12"
+    static let password = "uiTestPassword12"
     static let hint = "uitest"
     static let displayName = "测试用户"
 }
@@ -80,8 +90,15 @@ enum AccessibilityID {
     static let singleStart = "single.start"
     static let singleNameA = "single.nameA"
     static let singleNameB = "single.nameB"
+    static let consentStatement = "consent.statement"
     static let consentAccept = "consent.accept"
     static let consentStart = "consent.start"
+    static let recordingWatermark = "recording.watermark"
+    static let encryptionVault = "encryption.method.vault"
+    static let encryptionOneTime = "encryption.method.oneTime"
+    static let encryptionAutofillVault = "encryption.autofillVault"
+    static let encryptionEncrypt = "encryption.encrypt"
+    static let completionHome = "completion.home"
     static let dualHost = "dual.host"
     static let dualScan = "dual.scan"
 }

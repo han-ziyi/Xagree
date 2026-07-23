@@ -5,6 +5,7 @@ import Foundation
 enum VaultError: LocalizedError {
     case invalidPassword
     case passwordTooShort
+    case passwordContainsInvalidCharacters
     case hintTooLong
     case invalidProfile
     case missingVault
@@ -14,7 +15,8 @@ enum VaultError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidPassword: L10n.string("密码不正确。")
-        case .passwordTooShort: L10n.string("密码至少需要 12 个字符。")
+        case .passwordTooShort: L10n.string("密码至少需要 8 位。")
+        case .passwordContainsInvalidCharacters: L10n.string("密码只能包含数字或英文字母。")
         case .hintTooLong: L10n.string("提示词最多 60 个字。")
         case .invalidProfile: L10n.string("姓名或头像数据无效。")
         case .missingVault: L10n.string("本机没有可打开的私密空间。")
@@ -53,7 +55,14 @@ final class VaultStore {
     }
 
     func create(password: String, hint: String?) throws {
-        guard password.count >= 12 else { throw VaultError.passwordTooShort }
+        switch PasswordPolicy.validationIssue(for: password) {
+        case .tooShort:
+            throw VaultError.passwordTooShort
+        case .invalidCharacters:
+            throw VaultError.passwordContainsInvalidCharacters
+        case nil:
+            break
+        }
         let normalizedHint = hint?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         if let normalizedHint, normalizedHint.count > maxHintLength {
             throw VaultError.hintTooLong

@@ -32,12 +32,10 @@ enum CaptureError: LocalizedError, Equatable {
 
 struct CaptureRequest: Sendable {
     let watermark: RecordingWatermark
-    let watermarkText: String
     let maxDuration: TimeInterval
 
     init(watermark: RecordingWatermark, maxDuration: TimeInterval = 30) {
         self.watermark = watermark
-        self.watermarkText = watermark.displayText
         self.maxDuration = maxDuration
     }
 }
@@ -410,6 +408,8 @@ private nonisolated enum CaptureWriterRuntime {
         var audioInput: AVAssetWriterInput?
         var pixelAdaptor: AVAssetWriterInputPixelBufferAdaptor?
         var request: CaptureRequest?
+        var watermarkSecond: Int64?
+        var watermarkText: String?
         weak var videoOutput: AVCaptureVideoDataOutput?
         weak var audioOutput: AVCaptureAudioDataOutput?
     }
@@ -435,6 +435,8 @@ private nonisolated enum CaptureWriterRuntime {
             audioInput: audioInput,
             pixelAdaptor: pixelAdaptor,
             request: request,
+            watermarkSecond: nil,
+            watermarkText: nil,
             videoOutput: videoOutput,
             audioOutput: audioOutput
         )
@@ -484,9 +486,10 @@ private nonisolated enum CaptureWriterRuntime {
             guard videoInput.isReadyForMoreMediaData else { return }
 
             // 统一缩放到 writer 设定的 1080×1920，避免分辨率不匹配导致丢帧/黑屏
+            let watermarkText = liveWatermarkText(for: request, id: id)
             guard let watermarked = WatermarkRenderer.shared.render(
                 pixelBuffer: imageBuffer,
-                text: request.watermarkText,
+                text: watermarkText,
                 targetSize: CGSize(width: 1080, height: 1920)
             ) else { return }
             pixelAdaptor.append(watermarked, withPresentationTime: timestamp)
@@ -499,6 +502,18 @@ private nonisolated enum CaptureWriterRuntime {
                   audioInput.isReadyForMoreMediaData else { return }
             audioInput.append(sampleBuffer)
         }
+    }
+
+    private static func liveWatermarkText(for request: CaptureRequest, id: UUID) -> String {
+        let now = Date()
+        let second = Int64(now.timeIntervalSince1970)
+        lock.lock()
+        defer { lock.unlock() }
+        if states[id]?.watermarkSecond != second {
+            states[id]?.watermarkSecond = second
+            states[id]?.watermarkText = request.watermark.displayText(at: now)
+        }
+        return states[id]?.watermarkText ?? request.watermark.displayText(at: now)
     }
 }
 
@@ -577,28 +592,54 @@ final class WatermarkRenderer: @unchecked Sendable {
             .foregroundColor: UIColor.white
         ]
         let nsText = text as NSString
-        let textSize = nsText.size(withAttributes: attributes)
+        let maximumTextWidth = CGFloat(targetW) - 64
+        let textBounds = nsText.boundingRect(
+            with: CGSize(width: maximumTextWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
+        ).integral
         let padding: CGFloat = 10
         let boxRect = CGRect(
-            x: CGFloat(targetW) - textSize.width - padding * 2 - 16,
+            x: 16,
             y: 16,
-            width: textSize.width + padding * 2,
-            height: textSize.height + padding
+            width: min(maximumTextWidth + padding * 2, textBounds.width + padding * 2),
+            height: textBounds.height + padding * 2
         )
         cgContext.setFillColor(UIColor.black.withAlphaComponent(0.62).cgColor)
         let path = UIBezierPath(roundedRect: boxRect, cornerRadius: 5)
         cgContext.addPath(path.cgPath)
         cgContext.fillPath()
         nsText.draw(
-            in: CGRect(
+            with: CGRect(
                 x: boxRect.minX + padding,
-                y: boxRect.minY + padding / 2,
-                width: textSize.width,
-                height: textSize.height
+                y: boxRect.minY + padding,
+                width: boxRect.width - padding * 2,
+                height: boxRect.height - padding * 2
             ),
-            withAttributes: attributes
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: attributes,
+            context: nil
         )
         return output
+    }
+}
+
+struct LiveRecordingWatermarkView: View {
+    let watermark: RecordingWatermark
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            Text(watermark.displayText(at: context.date))
+                .font(.caption2.monospaced())
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.leading)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(8)
+                .background(.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 6))
+        }
+        .accessibilityIdentifier(AccessibilityID.recordingWatermark)
     }
 }
 

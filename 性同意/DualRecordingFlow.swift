@@ -623,11 +623,7 @@ private struct DualCaptureView: View {
                         .background(.black.opacity(0.55), in: Circle())
                 }
                 if let watermark {
-                    Text(watermark.displayText)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.white)
-                        .padding(8)
-                        .background(.black.opacity(0.62), in: RoundedRectangle(cornerRadius: 6))
+                    LiveRecordingWatermarkView(watermark: watermark)
                 }
                 Button {
                     if capture.isRecording { capture.stop() }
@@ -681,7 +677,7 @@ private struct DualCaptureView: View {
 private struct DualProtectEvidenceView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var model: DualSessionModel
-    @State private var useVaultPassword = true
+    @State private var method: EncryptionMethod = .vault
     @State private var password = ""
     @State private var confirmation = ""
 
@@ -691,35 +687,39 @@ private struct DualProtectEvidenceView: View {
                 Text("双方视频已合成为一条成片（A → B）。请设置此设备副本的密码；另一台设备可以使用不同密码。")
                     .foregroundStyle(.secondary)
             }
-            Section("加密方式") {
-                Picker("方式", selection: $useVaultPassword) {
-                    Text("使用私密空间密码").tag(true)
-                    Text("设置一次性密码").tag(false)
-                }
-                .pickerStyle(.inline)
-            }
-            Section(useVaultPassword ? L10n.string("确认私密空间密码") : L10n.string("本机副本密码")) {
-                SecureField(
-                    useVaultPassword ? L10n.string("输入当前私密空间密码") : L10n.string("至少 12 个字符"),
-                    text: $password
-                )
-                if !useVaultPassword {
+            EncryptionMethodSections(selection: $method)
+            Section(method == .vault ? L10n.string("私密空间密码") : L10n.string("本机副本密码")) {
+                if method == .vault {
+                    Button {
+                        password = appState.activePassword
+                    } label: {
+                        Label(password.isEmpty ? "一键填入总密码" : "总密码已填入", systemImage: password.isEmpty ? "key.fill" : "checkmark.circle.fill")
+                    }
+                    .accessibilityIdentifier(AccessibilityID.encryptionAutofillVault)
+                } else {
+                    SecureField(L10n.string("至少 8 位，只能包含数字或英文字母"), text: $password)
                     SecureField("再次输入密码", text: $confirmation)
+                    PasswordValidationFeedback(password: password, confirmation: confirmation)
                 }
             }
             Section {
                 Button("加密并选择 iCloud Drive 保存位置") {
-                    guard !useVaultPassword || password == appState.activePassword else {
+                    guard method != .vault || password == appState.activePassword else {
                         model.error = AppError(title: "密码不正确", detail: "请输入当前私密空间密码，或改用一次性密码。")
                         return
                     }
                     Task { await model.encrypt(password: password) }
                 }
                 .frame(maxWidth: .infinity)
-                .disabled(password.isEmpty || (!useVaultPassword && (password.count < 12 || password != confirmation)))
+                .disabled(password.isEmpty || (method == .oneTime && (!PasswordPolicy.isValid(password) || password != confirmation)))
+                .accessibilityIdentifier(AccessibilityID.encryptionEncrypt)
             }
         }
         .appReadableWidth()
+        .onChange(of: method) { _, _ in
+            password.removeAll()
+            confirmation.removeAll()
+        }
     }
 }
 
@@ -754,13 +754,28 @@ private struct DualExportEvidenceView: View {
 }
 
 private struct DualCompletionView: View {
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.seal.fill").font(.system(size: 54)).foregroundStyle(.green)
-            Text("本机私密副本已导出").font(.title2.bold())
-            Text("两台设备应各自完成导出。明文工作文件已删除。")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        ScrollView {
+            VStack(spacing: 16) {
+                Image(systemName: "checkmark.seal.fill").font(.system(size: 54)).foregroundStyle(.green)
+                Text("本机私密副本已导出").font(.title2.bold())
+                Text("两台设备应各自完成导出。明文工作文件已删除。")
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button {
+                    dismiss()
+                } label: {
+                    Label("返回首页", systemImage: "house.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .accessibilityIdentifier(AccessibilityID.completionHome)
+            }
+            .frame(maxWidth: 680)
+            .padding(28)
+            .frame(maxWidth: .infinity, minHeight: 420)
         }
     }
 }
