@@ -256,6 +256,38 @@
         }
       }
     },
+    "二维码文字信息" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR code text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QRコードのテキスト情報"
+          }
+        }
+      }
+    },
+    "复制文字信息" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テキスト情報をコピー"
+          }
+        }
+      }
+    },
     "仅限所有参与者明确知情、自愿且已达到法定成年年龄时使用。" : {
       "localizations" : {
         "en" : {
@@ -1437,6 +1469,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "暗号化済み"
+          }
+        }
+      }
+    },
+    "已复制" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copied"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コピーしました"
           }
         }
       }

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import VisionKit
 
 struct DualSessionView: View {
@@ -8,6 +9,7 @@ struct DualSessionView: View {
     @StateObject private var workflow: DualSessionModel
     @State private var joinCode = ""
     @State private var showScanner = false
+    @State private var copiedInvitationCode: String?
     @State private var error: AppError?
 
     init(profile: ParticipantProfile) {
@@ -127,6 +129,33 @@ struct DualSessionView: View {
                     .padding(12)
                     .background(.white, in: RoundedRectangle(cornerRadius: 8))
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("二维码文字信息")
+                        .font(.subheadline.weight(.semibold))
+                    Text(code)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(AppTheme.paper, in: RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(AppTheme.line, lineWidth: 1))
+                        .accessibilityIdentifier(AccessibilityID.dualInvitationText)
+                    Button {
+                        UIPasteboard.general.string = code
+                        copiedInvitationCode = code
+                    } label: {
+                        if copiedInvitationCode == code {
+                            Label("已复制", systemImage: "checkmark")
+                        } else {
+                            Label("复制文字信息", systemImage: "doc.on.doc")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier(AccessibilityID.dualInvitationCopy)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             ProgressView("等待附近设备扫码…")
             Button("取消") { coordinator.stop() }

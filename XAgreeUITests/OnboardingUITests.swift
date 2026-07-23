@@ -376,4 +376,20 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(element("dual.host").waitForExistence(timeout: 3))
         XCTAssertTrue(element("dual.scan").exists)
     }
+
+    func testHostingShowsCopyableQRCodeText() throws {
+        prepareApp()
+        launchSkipToHome()
+        waitTap("home.dual")
+        waitTap("dual.host")
+
+        let invitationText = element("dual.invitation.text")
+        XCTAssertTrue(invitationText.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(invitationText.label.count, 100, "the full QR payload should be visible as text")
+
+        let copyButton = scrollTo("dual.invitation.copy")
+        XCTAssertTrue(copyButton.waitForExistence(timeout: 3))
+        copyButton.tap()
+        XCTAssertEqual(copyButton.label, "已复制")
+    }
 }

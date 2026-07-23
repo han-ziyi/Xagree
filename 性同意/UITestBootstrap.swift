@@ -103,4 +103,6 @@ enum AccessibilityID {
     static let completionHome = "completion.home"
     static let dualHost = "dual.host"
     static let dualScan = "dual.scan"
+    static let dualInvitationText = "dual.invitation.text"
+    static let dualInvitationCopy = "dual.invitation.copy"
 }
