@@ -241,7 +241,7 @@ nonisolated enum AppFiles {
         return workURL.appendingPathComponent(UUID().uuidString).appendingPathExtension(fileExtension)
     }
 
-    static func exportPackageFileName(
+    static func exportPackageBaseName(
         at date: Date = Date(),
         timeZone: TimeZone = .current
     ) -> String {
@@ -252,7 +252,7 @@ nonisolated enum AppFiles {
             from: date
         )
         return String(
-            format: "XAgree-%04d%02d%02d-%02d%02d%02d.xagree",
+            format: "%04d-%02d-%02d_%02d-%02d-%02d",
             components.year ?? 0,
             components.month ?? 0,
             components.day ?? 0,
@@ -260,6 +260,13 @@ nonisolated enum AppFiles {
             components.minute ?? 0,
             components.second ?? 0
         )
+    }
+
+    static func exportPackageFileName(
+        at date: Date = Date(),
+        timeZone: TimeZone = .current
+    ) -> String {
+        exportPackageBaseName(at: date, timeZone: timeZone) + ".xagree"
     }
 
     static func exportPackageURL(

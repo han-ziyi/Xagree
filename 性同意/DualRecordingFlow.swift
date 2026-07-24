@@ -881,6 +881,7 @@ private struct DualExportEvidenceView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var model: DualSessionModel
     @State private var isExporting = true
+    @State private var defaultFilename = AppFiles.exportPackageBaseName()
 
     var body: some View {
         VStack(spacing: 18) {
@@ -891,18 +892,23 @@ private struct DualExportEvidenceView: View {
                 .multilineTextAlignment(.center)
             Button("重新打开保存器") { isExporting = true }.buttonStyle(.bordered)
         }
-        .sheet(isPresented: $isExporting) {
-            if let url = model.encryptedPackageURL {
-                FileExportSheet(url: url) {
-                    model.finishExport()
-                    isExporting = false
-                    appState.refreshDrafts()
-                } onCancelled: {
-                    model.cancelExport(saveDraft: true)
-                    isExporting = false
-                    appState.refreshDrafts()
-                }
+        .fileExporter(
+            isPresented: $isExporting,
+            item: model.encryptedPackageURL.map(EvidenceExportItem.init),
+            contentTypes: [.xagreeEvidence],
+            defaultFilename: defaultFilename
+        ) { result in
+            switch result {
+            case .success:
+                model.finishExport()
+            case .failure(let error):
+                model.cancelExport(saveDraft: true)
+                model.error = AppError(title: "无法保存", detail: error.localizedDescription)
             }
+            appState.refreshDrafts()
+        } onCancellation: {
+            model.cancelExport(saveDraft: true)
+            appState.refreshDrafts()
         }
     }
 }

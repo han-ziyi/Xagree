@@ -1,38 +1,21 @@
 import AVKit
+import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct FileExportSheet: UIViewControllerRepresentable {
+extension UTType {
+    nonisolated static let xagreeEvidence = UTType(
+        exportedAs: "com.hanziyi.xagree.evidence",
+        conformingTo: .data
+    )
+}
+
+nonisolated struct EvidenceExportItem: Transferable, Sendable {
     let url: URL
-    let onCompleted: () -> Void
-    let onCancelled: () -> Void
 
-    func makeCoordinator() -> Coordinator { Coordinator(onCompleted: onCompleted, onCancelled: onCancelled) }
-
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
-        picker.delegate = context.coordinator
-        picker.shouldShowFileExtensions = true
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let onCompleted: () -> Void
-        let onCancelled: () -> Void
-
-        init(onCompleted: @escaping () -> Void, onCancelled: @escaping () -> Void) {
-            self.onCompleted = onCompleted
-            self.onCancelled = onCancelled
-        }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            onCompleted()
-        }
-
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-            onCancelled()
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .xagreeEvidence) { item in
+            SentTransferredFile(item.url)
         }
     }
 }

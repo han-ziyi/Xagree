@@ -17,7 +17,7 @@ final class EvidenceCryptoTests: XCTestCase {
                 at: date,
                 timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
             ),
-            "XAgree-20260724-153045.xagree"
+            "2026-07-24_15-30-45.xagree"
         )
     }
 
