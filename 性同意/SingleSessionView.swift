@@ -38,6 +38,17 @@ final class SingleSessionModel: ObservableObject {
         if UITestBootstrap.shouldShowSingleProtect {
             stage = .protect
             sessionPhase = .assembling
+        } else if UITestBootstrap.shouldShowSingleExport {
+            do {
+                try AppFiles.prepareDirectories()
+                let url = try AppFiles.exportPackageURL()
+                try Data("XAgree UI test export".utf8).write(to: url, options: .atomic)
+                encryptedPackageURL = url
+                stage = .export
+                sessionPhase = .awaitingExport
+            } catch {
+                assertionFailure("UITest export bootstrap failed: \(error)")
+            }
         } else if UITestBootstrap.shouldShowSingleCompletion {
             stage = .complete
             sessionPhase = .completed

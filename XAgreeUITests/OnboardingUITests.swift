@@ -368,6 +368,34 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(element("encryption.encrypt").isEnabled)
     }
 
+    func testNativeExporterUsesEditableTimestampFilename() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("This test resets its isolated App data and is simulator-only")
+        #endif
+
+        prepareApp()
+        launchSkipToHome(extraArguments: ["-UITestingSingleExport"])
+
+        waitTap("home.single")
+
+        let filenameField = app.textFields.firstMatch
+        XCTAssertTrue(
+            filenameField.waitForExistence(timeout: 10),
+            "the native file exporter should expose an editable filename field"
+        )
+
+        let originalName = try XCTUnwrap(filenameField.value as? String)
+        XCTAssertNotNil(
+            originalName.range(
+                of: #"^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(?:\.xagree)?$"#,
+                options: .regularExpression
+            ),
+            "unexpected default export filename: \(originalName)"
+        )
+        XCTAssertTrue(filenameField.isEnabled)
+        XCTAssertTrue(filenameField.isHittable)
+    }
+
     func testCompletionCanReturnHome() throws {
         prepareApp()
         launchSkipToHome(extraArguments: ["-UITestingSingleCompletion"])

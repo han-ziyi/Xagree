@@ -6,6 +6,7 @@ enum UITestBootstrap {
     static let resetFlag = "-UITestingReset"
     static let skipToHomeFlag = "-UITestingSkipToHome"
     static let singleProtectFlag = "-UITestingSingleProtect"
+    static let singleExportFlag = "-UITestingSingleExport"
     static let singleCompletionFlag = "-UITestingSingleCompletion"
 
     static func permitsTesting(arguments: [String], debugBuild: Bool) -> Bool {
@@ -31,6 +32,10 @@ enum UITestBootstrap {
         isUITesting && ProcessInfo.processInfo.arguments.contains(singleProtectFlag)
     }
 
+    static var shouldShowSingleExport: Bool {
+        isUITesting && ProcessInfo.processInfo.arguments.contains(singleExportFlag)
+    }
+
     static var shouldShowSingleCompletion: Bool {
         isUITesting && ProcessInfo.processInfo.arguments.contains(singleCompletionFlag)
     }
@@ -39,6 +44,15 @@ enum UITestBootstrap {
     @MainActor
     static func prepareIfNeeded() {
         guard isUITesting else { return }
+
+        #if !targetEnvironment(simulator)
+        // 真机上的 App 沙盒可能包含用户真实私密空间。任何会清空或预置数据的
+        // UI 测试启动参数都必须在执行文件操作前拒绝，避免测试误删真实数据。
+        guard !shouldReset, !shouldSkipToHome else {
+            assertionFailure("Destructive UI test bootstrap is simulator-only")
+            return
+        }
+        #endif
 
         if shouldReset || shouldSkipToHome {
             // 清本机文件与引导标记，保证测试可重复
