@@ -2,6 +2,22 @@ import SwiftUI
 import UIKit
 import VisionKit
 
+enum DualSessionPresentationPolicy {
+    static func usesStandaloneFlowLayout(
+        stage: DualSessionModel.Stage,
+        isPeerPaired: Bool,
+        canContinueWithoutPeer: Bool
+    ) -> Bool {
+        guard isPeerPaired || canContinueWithoutPeer else { return false }
+        return switch stage {
+        case .ready, .waitingToRecord, .processing, .waitingForPeer, .protect, .export, .complete:
+            true
+        case .recoverStaging:
+            false
+        }
+    }
+}
+
 struct DualSessionView: View {
     let profile: ParticipantProfile
     @EnvironmentObject private var appState: AppState
@@ -70,13 +86,11 @@ struct DualSessionView: View {
     }
 
     private var usesStandaloneFlowLayout: Bool {
-        guard coordinator.state == .paired else { return false }
-        return switch workflow.stage {
-        case .ready, .waitingToRecord, .processing, .waitingForPeer, .protect, .export, .complete:
-            true
-        case .recoverStaging:
-            false
-        }
+        DualSessionPresentationPolicy.usesStandaloneFlowLayout(
+            stage: workflow.stage,
+            isPeerPaired: coordinator.state == .paired,
+            canContinueWithoutPeer: workflow.canContinueWithoutPeer
+        )
     }
 
     @ViewBuilder

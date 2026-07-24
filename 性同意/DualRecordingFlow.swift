@@ -15,6 +15,17 @@ enum DualTransferGate {
     }
 }
 
+enum DualPeerConnectionPolicy {
+    static func canContinueWithoutPeer(sessionPhase: SessionPhase) -> Bool {
+        switch sessionPhase {
+        case .assembling, .encrypting, .awaitingExport, .completed:
+            true
+        case .draft, .paired, .armed, .recording, .transferring, .failed:
+            false
+        }
+    }
+}
+
 @MainActor
 final class DualSessionModel: ObservableObject {
     enum Stage: Equatable {
@@ -93,6 +104,10 @@ final class DualSessionModel: ObservableObject {
     var hasLocalSegment: Bool {
         guard let localSegment else { return false }
         return FileManager.default.fileExists(atPath: localSegment.url.path)
+    }
+    /// 双向视频均已接收并确认后，后续合成、加密和导出都只依赖本机数据。
+    var canContinueWithoutPeer: Bool {
+        DualPeerConnectionPolicy.canContinueWithoutPeer(sessionPhase: sessionPhase)
     }
     /// 中断恢复 UI：传输中/暂存恢复中
     var needsTransferRecoveryUI: Bool {
@@ -234,6 +249,8 @@ final class DualSessionModel: ObservableObject {
     }
 
     func handleDisconnectAfterRecording() {
+        // 双向传输已完成时，断开只结束后台连接，不能打断本机的保存流程。
+        guard !canContinueWithoutPeer else { return }
         // 仅在仍有待传输明文片段时进入恢复（合成后 hasLocalSegment 为 false）
         guard hasLocalSegment || stage == .waitingForPeer || stage == .recoverStaging else { return }
         stage = .recoverStaging

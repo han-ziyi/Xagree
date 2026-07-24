@@ -763,6 +763,38 @@ final class PeerPairingTests: XCTestCase {
         ))
     }
 
+    func testDualSaveFlowRemainsVisibleAfterPeerDisconnectOnceTransferCompleted() {
+        for phase in [
+            SessionPhase.assembling,
+            .encrypting,
+            .awaitingExport,
+            .completed
+        ] {
+            XCTAssertTrue(
+                DualPeerConnectionPolicy.canContinueWithoutPeer(sessionPhase: phase),
+                "\(phase) should no longer depend on the peer connection"
+            )
+        }
+        XCTAssertFalse(
+            DualPeerConnectionPolicy.canContinueWithoutPeer(sessionPhase: .transferring)
+        )
+
+        XCTAssertTrue(
+            DualSessionPresentationPolicy.usesStandaloneFlowLayout(
+                stage: .export,
+                isPeerPaired: false,
+                canContinueWithoutPeer: true
+            )
+        )
+        XCTAssertFalse(
+            DualSessionPresentationPolicy.usesStandaloneFlowLayout(
+                stage: .waitingForPeer,
+                isPeerPaired: false,
+                canContinueWithoutPeer: false
+            )
+        )
+    }
+
     func testDualRecordingRequiresActivePairing() {
         let coordinator = PeerSessionCoordinator(
             profile: ParticipantProfile(name: "Alice", avatarData: nil)
