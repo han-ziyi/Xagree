@@ -594,19 +594,21 @@ struct HomeView: View {
                     Button {
                         destination = .dual
                     } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Label("两台手机", systemImage: "iphone.gen3.radiowaves.left.and.right")
-                                    .font(.body.weight(.medium))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label("两台手机", systemImage: "iphone.gen3.radiowaves.left.and.right")
+                                .font(.body.weight(.medium))
+                            HStack(spacing: 8) {
                                 Text("各自录制、各自保存")
                                     .font(.caption)
                                     .foregroundStyle(AppTheme.mutedInk)
+                                Spacer(minLength: 8)
+                                Text("更安心")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(AppTheme.sage)
+                                    .fixedSize(horizontal: true, vertical: false)
                             }
-                            Spacer()
-                            Text("更安心")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(AppTheme.sage)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .accessibilityIdentifier(AccessibilityID.homeDual)
                 }

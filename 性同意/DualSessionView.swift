@@ -20,22 +20,30 @@ struct DualSessionView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 22) {
-                if workflow.needsTransferRecoveryUI || workflow.stage == .recoverStaging {
-                    // 传输/暂存阶段保留流程，支持 10 分钟内重新配对
-                    DualRecordingFlow(model: workflow)
-                    if coordinator.state != .paired {
-                        Divider()
-                        connectionView
+        Group {
+            if usesStandaloneFlowLayout {
+                // 相机、处理中状态和 Form 必须直接占用导航内容，不能被外层 ScrollView 重新布局。
+                DualRecordingFlow(model: workflow)
+            } else {
+                ScrollView {
+                    VStack(spacing: 22) {
+                        if workflow.needsTransferRecoveryUI || workflow.stage == .recoverStaging {
+                            // 传输/暂存阶段保留流程，支持 10 分钟内重新配对
+                            DualRecordingFlow(model: workflow)
+                            if coordinator.state != .paired {
+                                Divider()
+                                connectionView
+                            }
+                        } else {
+                            connectionView
+                        }
                     }
-                } else {
-                    connectionView
+                    .padding(24)
                 }
+                .appReadableWidth(680)
+                .background(AppTheme.canvas.ignoresSafeArea())
             }
-            .padding(24)
         }
-        .appReadableWidth(680)
         .background(AppTheme.canvas.ignoresSafeArea())
         .navigationTitle("双机记录")
         .navigationBarTitleDisplayMode(.inline)
@@ -48,20 +56,26 @@ struct DualSessionView: View {
             appState.refreshDrafts()
         }
         .sheet(isPresented: $showScanner) {
-            if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
-                QRScannerSheet { code in
-                    showScanner = false
-                    join(code: code)
-                } onFailure: { message in
-                    showScanner = false
-                    error = AppError(title: "无法扫码", detail: message)
-                }
-            } else {
-                ContentUnavailableView("此设备不支持扫码", systemImage: "qrcode.viewfinder", description: Text("请粘贴对方二维码中的文本。"))
+            QRCodeScannerSheet { code in
+                showScanner = false
+                join(code: code)
+            } onFailure: { message in
+                showScanner = false
+                error = AppError(title: "无法扫码", detail: message)
             }
         }
         .alert(item: $error) { error in
             Alert(title: Text(error.title), message: Text(error.detail), dismissButton: .default(Text("知道了")))
+        }
+    }
+
+    private var usesStandaloneFlowLayout: Bool {
+        guard coordinator.state == .paired else { return false }
+        return switch workflow.stage {
+        case .ready, .waitingToRecord, .processing, .waitingForPeer, .protect, .export, .complete:
+            true
+        case .recoverStaging:
+            false
         }
     }
 

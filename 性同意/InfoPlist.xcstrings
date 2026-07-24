@@ -7,14 +7,14 @@
       "localizations" : {
         "en" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "同意爱"
+            "state" : "translated",
+            "value" : "XAgree"
           }
         },
         "ja" : {
           "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "同意爱"
+            "state" : "translated",
+            "value" : "同意愛"
           }
         },
         "zh-Hans" : {
@@ -29,6 +29,18 @@
       "comment" : "Bundle name",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "XAgree"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同意愛"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",

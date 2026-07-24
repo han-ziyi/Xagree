@@ -1,6 +1,20 @@
 import Combine
 import SwiftUI
 
+enum DualTransferGate {
+    static func canAssemble(
+        localURL: URL,
+        remoteURL: URL?,
+        remoteManifest: SegmentManifest?,
+        peerAcknowledgedLocalRecording: Bool
+    ) -> Bool {
+        FileManager.default.fileExists(atPath: localURL.path)
+            && remoteURL.map { FileManager.default.fileExists(atPath: $0.path) } == true
+            && remoteManifest != nil
+            && peerAcknowledgedLocalRecording
+    }
+}
+
 @MainActor
 final class DualSessionModel: ObservableObject {
     enum Stage: Equatable {
@@ -31,6 +45,7 @@ final class DualSessionModel: ObservableObject {
     private var finalVideoURL: URL?
     private var hasStartedAssembly = false
     private var vaultPasswordForStaging: String = ""
+    private var cancellables = Set<AnyCancellable>()
 
     init(profile: ParticipantProfile, coordinator: PeerSessionCoordinator) {
         self.profile = profile
@@ -39,6 +54,19 @@ final class DualSessionModel: ObservableObject {
             stage = .recoverStaging
             sessionPhase = .transferring
         }
+
+        coordinator.$receivedRecordingURL
+            .combineLatest(
+                coordinator.$remoteSegmentManifest,
+                coordinator.$remoteAcknowledgedLocalRecording
+            )
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.peerDataChanged()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     var localRole: ParticipantRole { coordinator.localRole ?? .a }
@@ -97,10 +125,12 @@ final class DualSessionModel: ObservableObject {
     func markReady() {
         do {
             markPairedIfNeeded()
+            guard coordinator.state == .paired else {
+                throw PeerPairingError.invalidState
+            }
             guard sessionPhase.canTransition(to: .armed) else {
                 throw SessionFailure.illegalTransition(from: sessionPhase, to: .armed)
             }
-            try coordinator.markRecordingReady()
             sessionPhase = .armed
             stage = .waitingToRecord
         } catch {
@@ -417,10 +447,14 @@ final class DualSessionModel: ObservableObject {
     private func assembleIfReady() async {
         guard !hasStartedAssembly,
               let local = localSegment,
-              FileManager.default.fileExists(atPath: local.url.path),
               let remoteURL = coordinator.receivedRecordingURL,
-              FileManager.default.fileExists(atPath: remoteURL.path),
-              let remoteManifest = coordinator.remoteSegmentManifest ?? retainedRemoteManifest else { return }
+              let remoteManifest = coordinator.remoteSegmentManifest ?? retainedRemoteManifest,
+              DualTransferGate.canAssemble(
+                localURL: local.url,
+                remoteURL: remoteURL,
+                remoteManifest: remoteManifest,
+                peerAcknowledgedLocalRecording: coordinator.remoteAcknowledgedLocalRecording
+              ) else { return }
         hasStartedAssembly = true
         retainedRemoteManifest = remoteManifest
         stage = .processing(L10n.string("正在校验并合并双方视频…"))
@@ -480,7 +514,13 @@ final class DualSessionModel: ObservableObject {
 
 struct DualRecordingFlow: View {
     @ObservedObject var model: DualSessionModel
+    @ObservedObject private var coordinator: PeerSessionCoordinator
     @EnvironmentObject private var appState: AppState
+
+    init(model: DualSessionModel) {
+        _model = ObservedObject(wrappedValue: model)
+        _coordinator = ObservedObject(wrappedValue: model.coordinator)
+    }
 
     var body: some View {
         Group {
@@ -494,8 +534,16 @@ struct DualRecordingFlow: View {
             case .waitingForPeer:
                 VStack(spacing: 16) {
                     ProgressView().controlSize(.large)
-                    Text("正在接收对方的加密视频…")
+                    Text("正在同步双方视频…")
                         .font(.headline)
+                    Label(
+                        coordinator.receivedRecordingURL == nil ? "正在接收对方视频" : "已收到并验证对方视频",
+                        systemImage: coordinator.receivedRecordingURL == nil ? "arrow.down.circle" : "checkmark.circle.fill"
+                    )
+                    Label(
+                        coordinator.remoteAcknowledgedLocalRecording ? "对方已确认收到我的视频" : "等待对方确认收到我的视频",
+                        systemImage: coordinator.remoteAcknowledgedLocalRecording ? "checkmark.circle.fill" : "arrow.up.circle"
+                    )
                     Text("视频通过附近设备直接传输，不经过开发者服务器。")
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -530,13 +578,7 @@ struct DualRecordingFlow: View {
             model.setVaultPassword(appState.activePassword)
             model.markPairedIfNeeded()
         }
-        .onChange(of: model.coordinator.receivedRecordingURL) { _, _ in
-            Task { await model.peerDataChanged() }
-        }
-        .onChange(of: model.coordinator.remoteSegmentManifest) { _, _ in
-            Task { await model.peerDataChanged() }
-        }
-        .onChange(of: model.coordinator.state) { _, newState in
+        .onChange(of: coordinator.state) { _, newState in
             if case .failed = newState, model.hasLocalSegment || model.stage == .waitingForPeer {
                 model.handleDisconnectAfterRecording()
             }
@@ -555,25 +597,41 @@ private struct DualConsentView: View {
     @State private var accepted = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("双方同步录制")
-                .font(.title2.bold())
-            Text("请由 \(model.localName) 本人读完并准备录制。对方也准备好后，两台设备会一起开始 3 秒倒计时。")
-                .foregroundStyle(.secondary)
-            Text(ConsentStatement.text(participantName: model.localName, otherParticipantName: model.remoteName))
-                .font(.body)
-                .padding()
-                .background(AppTheme.accentSoft, in: RoundedRectangle(cornerRadius: 8))
-            Toggle("我已阅读并理解以上说明", isOn: $accepted)
-            Button("本人已准备好") { model.markReady() }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
-                .disabled(!accepted)
-            Text("录制和传输期间请让两台设备保持靠近、保持应用在前台。中断后片段可暂存 10 分钟。")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                Text("将手机交给参与者 \(model.localRole.rawValue)")
+                    .font(.title2.bold())
+                Text("请把手机交给 \(model.localName)，由本人读完并亲自开始。")
+                    .foregroundStyle(.secondary)
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "quote.opening")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(AppTheme.accent)
+                        .accessibilityHidden(true)
+                    Text(ConsentStatement.text(participantName: model.localName, otherParticipantName: model.remoteName))
+                        .font(.title3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                    .accessibilityIdentifier(AccessibilityID.consentStatement)
+                    .padding(16)
+                    .background(AppTheme.accentSoft, in: RoundedRectangle(cornerRadius: 18))
+                Toggle("我已阅读并理解以上说明", isOn: $accepted)
+                    .accessibilityIdentifier(AccessibilityID.consentAccept)
+                Button("本人开始录制") { model.markReady() }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .disabled(!accepted)
+                    .accessibilityIdentifier(AccessibilityID.consentStart)
+                Text("录制时将显示明显的 REC 状态和剩余时间；最长 30 秒。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
         }
+        .appReadableWidth(680)
+        .navigationTitle("参与者 \(model.localRole.rawValue) 确认")
+        .background(AppTheme.canvas.ignoresSafeArea())
     }
 }
 
@@ -581,6 +639,8 @@ private struct DualCaptureView: View {
     @ObservedObject var model: DualSessionModel
     @StateObject private var capture = CaptureService()
     @State private var started = false
+    @State private var isCountingDown = false
+    @State private var recordingTask: Task<Void, Never>?
     @State private var countdown = 3
     @State private var watermark: RecordingWatermark?
     @State private var setupError: AppError?
@@ -591,12 +651,15 @@ private struct DualCaptureView: View {
                 CameraPreview(session: capture.session).ignoresSafeArea()
             } else {
                 Color.black.ignoresSafeArea()
-                ProgressView("正在准备相机…").tint(.white)
+                ProgressView("正在准备相机…")
+                    .tint(.white)
+                    .foregroundStyle(.white)
             }
             VStack {
                 HStack {
                     if capture.isRecording {
                         Label("REC", systemImage: "record.circle.fill")
+                            .font(.headline)
                             .foregroundStyle(.red)
                     }
                     Spacer()
@@ -608,57 +671,80 @@ private struct DualCaptureView: View {
                         .monospacedDigit()
                         .foregroundStyle(.white)
                 }
-                .padding(12)
-                .background(.black.opacity(0.6), in: Capsule())
+                .padding(14)
+                .background(.black.opacity(0.56), in: Capsule())
+                .padding(.top, 10)
+
                 Spacer()
-                if !started {
-                    Text(
-                        model.coordinator.recordingStartSignal == 0
-                            ? L10n.string("等待对方准备…")
-                            : "\(countdown)"
-                    )
-                        .font(.system(size: 54, weight: .bold, design: .rounded))
+
+                if isCountingDown {
+                    Text("\(countdown)")
+                        .font(.system(size: 72, weight: .bold, design: .rounded))
                         .foregroundStyle(.white)
-                        .padding()
+                        .padding(28)
                         .background(.black.opacity(0.55), in: Circle())
                 }
+
                 if let watermark {
                     LiveRecordingWatermarkView(watermark: watermark)
+                        .padding(.horizontal)
                 }
+
                 Button {
-                    if capture.isRecording { capture.stop() }
+                    if capture.isRecording {
+                        capture.stop()
+                    } else if !started {
+                        startCountdownAndRecord()
+                    }
                 } label: {
-                    Circle().fill(.white).frame(width: 72, height: 72)
-                        .overlay(RoundedRectangle(cornerRadius: 7).fill(.red).frame(width: 32, height: 32))
+                    ZStack {
+                        Circle().fill(.white).frame(width: 76, height: 76)
+                        Circle()
+                            .fill(capture.isRecording ? .red : .red.opacity(0.85))
+                            .frame(width: capture.isRecording ? 34 : 58, height: capture.isRecording ? 34 : 58)
+                            .clipShape(RoundedRectangle(cornerRadius: capture.isRecording ? 7 : 29))
+                    }
                 }
-                .opacity(capture.isRecording ? 1 : 0)
-                .padding(.bottom, 24)
+                .disabled(!capture.isPrepared || (started && !capture.isRecording) || isCountingDown)
+                .padding(.bottom, 28)
             }
             .padding(.horizontal, 22)
         }
+        .navigationTitle("参与者 \(model.localRole.rawValue) 录制")
+        .navigationBarBackButtonHidden(capture.isRecording || started || isCountingDown)
         .task {
             do {
                 try await capture.prepare()
-                startIfSignaled()
             } catch {
                 setupError = AppError(title: "无法使用相机", detail: error.localizedDescription)
             }
         }
-        .onChange(of: model.coordinator.recordingStartSignal) { _, _ in startIfSignaled() }
-        .onDisappear { capture.stopSession() }
+        .onDisappear {
+            recordingTask?.cancel()
+            capture.stopSession()
+        }
         .alert(item: $setupError) { error in
             Alert(title: Text(error.title), message: Text(error.detail), dismissButton: .default(Text("知道了")))
         }
     }
 
-    private func startIfSignaled() {
-        guard !started, capture.isPrepared, model.coordinator.recordingStartSignal > 0 else { return }
+    private func startCountdownAndRecord() {
+        guard !started, capture.isPrepared else { return }
         started = true
-        Task {
+        isCountingDown = true
+        recordingTask = Task {
+            defer { recordingTask = nil }
             for value in stride(from: 3, through: 1, by: -1) {
                 countdown = value
-                try? await Task.sleep(for: .seconds(1))
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    started = false
+                    isCountingDown = false
+                    return
+                }
             }
+            isCountingDown = false
             let nextWatermark = model.watermark()
             watermark = nextWatermark
             do {
@@ -693,7 +779,10 @@ private struct DualProtectEvidenceView: View {
                     Button {
                         password = appState.activePassword
                     } label: {
-                        Label(password.isEmpty ? "一键填入总密码" : "总密码已填入", systemImage: password.isEmpty ? "key.fill" : "checkmark.circle.fill")
+                        Label(
+                            password.isEmpty ? "一键填入私密空间密码" : "私密空间密码已填入",
+                            systemImage: password.isEmpty ? "key.fill" : "checkmark.circle.fill"
+                        )
                     }
                     .accessibilityIdentifier(AccessibilityID.encryptionAutofillVault)
                 } else {

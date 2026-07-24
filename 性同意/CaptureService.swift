@@ -79,22 +79,23 @@ final class CaptureService: NSObject, ObservableObject {
 
         session.beginConfiguration()
         do {
-            if session.canSetSessionPreset(.hd1920x1080) {
-                session.sessionPreset = .hd1920x1080
-            } else {
-                session.sessionPreset = .high
-            }
-
             guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front) else {
                 throw CaptureError.cameraUnavailable
             }
             try configureCamera(camera)
 
             let videoDeviceInput = try AVCaptureDeviceInput(device: camera)
+            session.sessionPreset = .high
             guard session.canAddInput(videoDeviceInput) else {
                 throw CaptureError.cameraUnavailable
             }
             session.addInput(videoDeviceInput)
+
+            if session.canSetSessionPreset(.hd1920x1080) {
+                session.sessionPreset = .hd1920x1080
+            } else if session.canSetSessionPreset(.hd1280x720) {
+                session.sessionPreset = .hd1280x720
+            }
 
             guard let microphone = AVCaptureDevice.default(for: .audio) else {
                 throw CaptureError.microphoneUnavailable
@@ -196,6 +197,9 @@ final class CaptureService: NSObject, ObservableObject {
         defer { camera.unlockForConfiguration() }
         if camera.isFocusModeSupported(.continuousAutoFocus) {
             camera.focusMode = .continuousAutoFocus
+        }
+        if camera.minAvailableVideoZoomFactor <= 1, camera.maxAvailableVideoZoomFactor >= 1 {
+            camera.videoZoomFactor = 1
         }
         let desired = CMTime(value: 1, timescale: 30)
         camera.activeVideoMinFrameDuration = desired
@@ -650,17 +654,28 @@ struct CameraPreview: UIViewRepresentable {
 
     func makeUIView(context: Context) -> PreviewView {
         let preview = PreviewView()
+        preview.backgroundColor = .black
         preview.previewLayer.session = session
-        preview.previewLayer.videoGravity = .resizeAspectFill
-        if let connection = preview.previewLayer.connection, connection.isVideoMirroringSupported {
-            connection.automaticallyAdjustsVideoMirroring = false
-            connection.isVideoMirrored = true
-        }
+        configure(preview.previewLayer)
         return preview
     }
 
     func updateUIView(_ uiView: PreviewView, context: Context) {
         uiView.previewLayer.session = session
+        configure(uiView.previewLayer)
+    }
+
+    private func configure(_ previewLayer: AVCaptureVideoPreviewLayer) {
+        // iPad's 4:3 canvas otherwise crops a 9:16 camera frame heavily and looks zoomed.
+        previewLayer.videoGravity = .resizeAspect
+        guard let connection = previewLayer.connection else { return }
+        if connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = false
+        }
+        if connection.isVideoRotationAngleSupported(90) {
+            connection.videoRotationAngle = 90
+        }
     }
 }
 

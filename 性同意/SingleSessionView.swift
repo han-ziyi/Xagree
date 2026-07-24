@@ -384,12 +384,6 @@ private struct SingleDetailsView: View {
             .background(.bar)
             .accessibilityIdentifier(AccessibilityID.singleStart)
         }
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("完成") { focusedField = nil }
-            }
-        }
     }
 }
 
@@ -636,7 +630,10 @@ private struct ProtectEvidenceView: View {
                     Button {
                         password = appState.activePassword
                     } label: {
-                        Label(password.isEmpty ? "一键填入总密码" : "总密码已填入", systemImage: password.isEmpty ? "key.fill" : "checkmark.circle.fill")
+                        Label(
+                            password.isEmpty ? "一键填入私密空间密码" : "私密空间密码已填入",
+                            systemImage: password.isEmpty ? "key.fill" : "checkmark.circle.fill"
+                        )
                     }
                     .accessibilityIdentifier(AccessibilityID.encryptionAutofillVault)
                 } else {

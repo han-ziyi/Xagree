@@ -5,7 +5,20 @@
       "shouldTranslate" : false
     },
     "%lld" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
     },
     "REC" : {
       "localizations" : {
@@ -88,8 +101,21 @@
         }
       }
     },
-    "一键填入总密码" : {
-
+    "一键填入私密空间密码" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fill private space password"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライベートスペースのパスワードを入力"
+          }
+        }
+      }
     },
     "不需要登录，也不会上传给开发者。双机模式只在附近设备之间直接传输；导出位置由你们自己选择。" : {
       "localizations" : {
@@ -239,6 +265,22 @@
         }
       }
     },
+    "二维码文字信息" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR code text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QRコードのテキスト情報"
+          }
+        }
+      }
+    },
     "二维码无效或不属于此版本的应用。" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -256,38 +298,6 @@
         }
       }
     },
-    "二维码文字信息" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QR code text"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "QRコードのテキスト情報"
-          }
-        }
-      }
-    },
-    "复制文字信息" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy text"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "テキスト情報をコピー"
-          }
-        }
-      }
-    },
     "仅限所有参与者明确知情、自愿且已达到法定成年年龄时使用。" : {
       "localizations" : {
         "en" : {
@@ -300,6 +310,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "関係する全員が内容を理解し、自発的に同意し、法的に成人である場合にのみ使用してください。"
+          }
+        }
+      }
+    },
+    "从相册导入二维码" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import QR code from Photos"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "写真からQRコードを読み込む"
           }
         }
       }
@@ -381,6 +407,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "こんにちは、%@"
+          }
+        }
+      }
+    },
+    "使用此文本" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use this text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このテキストを使用"
           }
         }
       }
@@ -824,10 +866,36 @@
       }
     },
     "参与者 %@ 录制" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Participant %@ recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加者%@の録画"
+          }
+        }
+      }
     },
     "参与者 %@ 确认" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Participant %@ confirmation"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加者%@の確認"
+          }
+        }
+      }
     },
     "参与者 A" : {
       "localizations" : {
@@ -846,7 +914,20 @@
       }
     },
     "参与者 A 姓名" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Participant A name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加者Aの名前"
+          }
+        }
+      }
     },
     "参与者 B" : {
       "localizations" : {
@@ -865,9 +946,23 @@
       }
     },
     "参与者 B 姓名" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Participant B name"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "参加者Bの名前"
+          }
+        }
+      }
     },
     "双方同步录制" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1127,6 +1222,22 @@
         }
       }
     },
+    "复制文字信息" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy text"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "テキスト情報をコピー"
+          }
+        }
+      }
+    },
     "姓名" : {
       "localizations" : {
         "en" : {
@@ -1326,6 +1437,22 @@
         }
       }
     },
+    "对方已确认收到我的视频" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partner confirmed receipt of my video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手が自分の動画の受信を確認しました"
+          }
+        }
+      }
+    },
     "对方显示姓名" : {
       "localizations" : {
         "en" : {
@@ -1506,6 +1633,22 @@
         }
       }
     },
+    "已收到并验证对方视频" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partner's video received and verified"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手の動画を受信し、検証しました"
+          }
+        }
+      }
+    },
     "已用私密空间密码加密暂存最多 10 分钟。重新配对成功后将自动继续传输。" : {
       "localizations" : {
         "en" : {
@@ -1639,6 +1782,7 @@
       }
     },
     "录制和传输期间请让两台设备保持靠近、保持应用在前台。中断后片段可暂存 10 分钟。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1736,9 +1880,6 @@
           }
         }
       }
-    },
-    "总密码已填入" : {
-
     },
     "我了解这是只留在我们手里的私密记录。" : {
       "localizations" : {
@@ -1946,6 +2087,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プライベートスペースを開く"
+          }
+        }
+      }
+    },
+    "扫描二维码" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan QR code"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QRコードをスキャン"
           }
         }
       }
@@ -2589,6 +2746,22 @@
         }
       }
     },
+    "无法识别二维码" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QR code not recognized"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QRコードを認識できません"
+          }
+        }
+      }
+    },
     "无法读取头像" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2792,6 +2965,7 @@
       }
     },
     "本人已准备好" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2808,7 +2982,20 @@
       }
     },
     "本人开始录制" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start recording"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画を開始"
+          }
+        }
+      }
     },
     "本机副本密码" : {
       "extractionState" : "stale",
@@ -2942,7 +3129,20 @@
       }
     },
     "正在准备相机…" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing camera…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "カメラを準備中…"
+          }
+        }
+      }
     },
     "正在加密本机副本…" : {
       "extractionState" : "stale",
@@ -2974,6 +3174,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "動画を暗号化中…"
+          }
+        }
+      }
+    },
+    "正在同步双方视频…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Syncing both videos…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ふたりの動画を同期中…"
           }
         }
       }
@@ -3030,6 +3246,7 @@
       }
     },
     "正在接收对方的加密视频…" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3041,6 +3258,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "相手の暗号化動画を受信中…"
+          }
+        }
+      }
+    },
+    "正在接收对方视频" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Receiving partner's video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手の動画を受信中"
           }
         }
       }
@@ -3130,8 +3363,21 @@
         }
       }
     },
-    "此设备不支持扫码" : {
-
+    "正在识别二维码…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading QR code…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "QRコードを読み取り中…"
+          }
+        }
+      }
     },
     "每个人都亲自参与" : {
       "extractionState" : "stale",
@@ -3200,7 +3446,20 @@
       }
     },
     "清除本机私密空间？" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear the private space on this device?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このデバイスのプライベートスペースを削除しますか？"
+          }
+        }
+      }
     },
     "清除本机私密空间…" : {
       "localizations" : {
@@ -3534,7 +3793,20 @@
       }
     },
     "私密空间" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private space"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライベートスペース"
+          }
+        }
+      }
     },
     "私密空间密码" : {
       "localizations" : {
@@ -3548,6 +3820,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プライベートスペースのパスワード"
+          }
+        }
+      }
+    },
+    "私密空间密码已填入" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Private space password filled"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライベートスペースのパスワードを入力しました"
           }
         }
       }
@@ -3570,10 +3858,68 @@
       }
     },
     "等待对方确认…" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for partner to confirm…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手の確認を待っています…"
+          }
+        }
+      }
+    },
+    "等待对方确认收到我的视频" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for partner to confirm receipt of my video"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相手が自分の動画を受信したことを確認するまでお待ちください"
+          }
+        }
+      }
     },
     "等待附近设备扫码…" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for a nearby device to scan…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近くのデバイスによるスキャンを待っています…"
+          }
+        }
+      }
+    },
+    "粘贴" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペースト"
+          }
+        }
+      }
     },
     "结束后按 A → B 合成为一段视频" : {
       "localizations" : {
@@ -3920,6 +4266,7 @@
       }
     },
     "请由 %@ 本人读完并准备录制。对方也准备好后，两台设备会一起开始 3 秒倒计时。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3936,6 +4283,7 @@
       }
     },
     "请粘贴对方二维码中的文本。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4101,7 +4449,20 @@
       }
     },
     "返回首页" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Return to Home"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ホームに戻る"
+          }
+        }
+      }
     },
     "这不是有效的私密记录文件。" : {
       "extractionState" : "stale",
@@ -4251,7 +4612,20 @@
       }
     },
     "选择保存方式" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose save method"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存方法を選択"
+          }
+        }
+      }
     },
     "选择头像" : {
       "extractionState" : "stale",

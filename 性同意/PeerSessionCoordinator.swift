@@ -70,14 +70,17 @@ private struct PairConfirmation: Codable {
     let sessionID: UUID
 }
 
-private struct RecordingControl: Codable {
-    enum Action: String, Codable {
-        case ready
-        case start
-    }
-
-    let action: Action
+struct RecordingReceipt: Codable, Equatable {
     let sessionID: UUID
+    let role: ParticipantRole
+    let sha256: String
+
+    func matches(sessionID: UUID, localRole: ParticipantRole, localManifest: SegmentManifest?) -> Bool {
+        guard let localManifest else { return false }
+        return self.sessionID == sessionID
+            && role == localRole
+            && sha256.caseInsensitiveCompare(localManifest.sha256) == .orderedSame
+    }
 }
 
 @MainActor
@@ -111,11 +114,9 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
     @Published private(set) var localConfirmed = false
     @Published private(set) var remoteConfirmed = false
     @Published private(set) var localRole: ParticipantRole?
-    @Published private(set) var recordingStartSignal = 0
-    @Published private(set) var localRecordingReady = false
-    @Published private(set) var remoteRecordingReady = false
     @Published private(set) var receivedRecordingURL: URL?
     @Published private(set) var remoteSegmentManifest: SegmentManifest?
+    @Published private(set) var remoteAcknowledgedLocalRecording = false
 
     private let profile: ParticipantProfile
     private let serviceType = "xagree-v1"
@@ -127,6 +128,8 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
     private var sessionKey: SymmetricKey?
     private var sessionID: UUID?
     private var joinedInvitation: PairingInvitation?
+    private var sentSegmentManifest: SegmentManifest?
+    private var acknowledgedRemoteSegmentSHA256: String?
 
     init(profile: ParticipantProfile) {
         self.profile = profile
@@ -199,15 +202,6 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         updateConfirmedState()
     }
 
-    func markRecordingReady() throws {
-        guard state == .paired, let sessionID else { throw PeerPairingError.invalidState }
-        try sendEncrypted(RecordingControl(action: .ready, sessionID: sessionID), kind: "recording")
-        localRecordingReady = true
-        if localRole == .a, remoteRecordingReady {
-            try beginRecording()
-        }
-    }
-
     func sendRecording(_ recordingURL: URL, manifest: SegmentManifest) throws {
         guard let sessionKey, let session, let sessionID else {
             throw PeerPairingError.keyAgreementFailed
@@ -218,9 +212,11 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         guard FileManager.default.fileExists(atPath: recordingURL.path) else {
             throw PeerPairingError.invalidPeerMessage
         }
+        sentSegmentManifest = manifest
+        remoteAcknowledgedLocalRecording = false
         try sendEncrypted(manifest, kind: "segment")
         let transferURL = try PeerFileCryptor.seal(inputURL: recordingURL, key: sessionKey, authenticatedData: Data(sessionID.uuidString.utf8))
-        let progress = session.sendResource(at: transferURL, withName: "xagree-recording", toPeer: peer) { error in
+        let completionHandler: @Sendable (Error?) -> Void = { [weak self] error in
             try? FileManager.default.removeItem(at: transferURL)
             if let error {
                 Task { @MainActor [weak self] in
@@ -228,6 +224,12 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
                 }
             }
         }
+        let progress = session.sendResource(
+            at: transferURL,
+            withName: "xagree-recording",
+            toPeer: peer,
+            withCompletionHandler: completionHandler
+        )
         guard progress != nil else {
             try? FileManager.default.removeItem(at: transferURL)
             throw PeerPairingError.localNetworkUnavailable
@@ -252,12 +254,12 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         localConfirmed = false
         remoteConfirmed = false
         localRole = nil
-        recordingStartSignal = 0
-        localRecordingReady = false
-        remoteRecordingReady = false
         EvidenceCryptor.remove(receivedRecordingURL)
         receivedRecordingURL = nil
         remoteSegmentManifest = nil
+        remoteAcknowledgedLocalRecording = false
+        sentSegmentManifest = nil
+        acknowledgedRemoteSegmentSHA256 = nil
         state = .idle
     }
 
@@ -334,18 +336,6 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
                 guard confirmation.sessionID == sessionID else { throw PeerPairingError.invalidPeerMessage }
                 remoteConfirmed = true
                 updateConfirmedState()
-            case "recording":
-                let control = try JSONDecoder().decode(RecordingControl.self, from: plaintext)
-                guard control.sessionID == sessionID else { throw PeerPairingError.invalidPeerMessage }
-                switch control.action {
-                case .ready:
-                    remoteRecordingReady = true
-                    if localRole == .a, localRecordingReady {
-                        try beginRecording()
-                    }
-                case .start:
-                    recordingStartSignal += 1
-                }
             case "segment":
                 let manifest = try JSONDecoder().decode(SegmentManifest.self, from: plaintext)
                 guard let localRole = self.localRole,
@@ -358,6 +348,17 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
                 }
                 remoteSegmentManifest = manifest
                 try validateReceivedRecordingIfReady()
+            case "recording-receipt":
+                let receipt = try JSONDecoder().decode(RecordingReceipt.self, from: plaintext)
+                guard let localRole,
+                      receipt.matches(
+                        sessionID: sessionID,
+                        localRole: localRole,
+                        localManifest: sentSegmentManifest
+                      ) else {
+                    throw PeerPairingError.invalidPeerMessage
+                }
+                remoteAcknowledgedLocalRecording = true
             default:
                 throw PeerPairingError.invalidPeerMessage
             }
@@ -375,6 +376,15 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
             self.receivedRecordingURL = nil
             throw PeerPairingError.invalidPeerMessage
         }
+        guard acknowledgedRemoteSegmentSHA256?.caseInsensitiveCompare(manifest.sha256) != .orderedSame else {
+            return
+        }
+        guard let sessionID else { throw PeerPairingError.invalidState }
+        try sendEncrypted(
+            RecordingReceipt(sessionID: sessionID, role: manifest.role, sha256: manifest.sha256),
+            kind: "recording-receipt"
+        )
+        acknowledgedRemoteSegmentSHA256 = manifest.sha256
     }
 
     private func updateConfirmedState() {
@@ -383,12 +393,6 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
             advertiser?.stopAdvertisingPeer()
             browser?.stopBrowsingForPeers()
         }
-    }
-
-    private func beginRecording() throws {
-        guard let sessionID else { throw PeerPairingError.invalidPeerMessage }
-        try sendEncrypted(RecordingControl(action: .start, sessionID: sessionID), kind: "recording")
-        recordingStartSignal += 1
     }
 
     private func shortCode(using key: SymmetricKey, sessionID: UUID) -> String {
@@ -434,21 +438,49 @@ extension PeerSessionCoordinator: MCSessionDelegate {
     nonisolated func session(_ session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, with progress: Progress) {}
 
     nonisolated func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: (any Error)?) {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard error == nil, let localURL, let key = self.sessionKey, let sessionID = self.sessionID else {
-                self.state = .failed(L10n.string("未能接收对方的视频。"))
-                return
+        guard resourceName == "xagree-recording", error == nil, let localURL else {
+            Task { @MainActor [weak self] in
+                self?.state = .failed(L10n.string("未能接收对方的视频。"))
             }
-            defer { try? FileManager.default.removeItem(at: localURL) }
-            do {
-                let decrypted = try PeerFileCryptor.open(inputURL: localURL, key: key, authenticatedData: Data(sessionID.uuidString.utf8))
-                EvidenceCryptor.remove(self.receivedRecordingURL)
-                self.receivedRecordingURL = decrypted
-                try self.validateReceivedRecordingIfReady()
-            } catch {
-                self.state = .failed(L10n.string("收到的视频无法通过加密校验。"))
+            return
+        }
+
+        // MCSession owns localURL only for the duration of this callback. Stage it before returning.
+        do {
+            let stagedURL = try PeerResourceStager.stage(localURL)
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    EvidenceCryptor.remove(stagedURL)
+                    return
+                }
+                self.finishReceivingRecording(at: stagedURL)
             }
+        } catch {
+            Task { @MainActor [weak self] in
+                self?.state = .failed(L10n.string("未能接收对方的视频。"))
+            }
+        }
+    }
+}
+
+private extension PeerSessionCoordinator {
+    func finishReceivingRecording(at stagedURL: URL) {
+        defer { EvidenceCryptor.remove(stagedURL) }
+        guard let key = sessionKey, let sessionID else {
+            state = .failed(L10n.string("未能接收对方的视频。"))
+            return
+        }
+        do {
+            let decrypted = try PeerFileCryptor.open(
+                inputURL: stagedURL,
+                key: key,
+                authenticatedData: Data(sessionID.uuidString.utf8)
+            )
+            EvidenceCryptor.remove(receivedRecordingURL)
+            receivedRecordingURL = decrypted
+            try validateReceivedRecordingIfReady()
+        } catch {
+            state = .failed(L10n.string("收到的视频无法通过加密校验。"))
         }
     }
 }
@@ -496,7 +528,30 @@ private extension FixedWidthInteger {
     }
 }
 
-private enum PeerFileCryptor {
+enum PeerResourceStager {
+    nonisolated static func stage(_ sourceURL: URL) throws -> URL {
+        let destinationURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("peer-incoming")
+        var shouldRemoveDestination = true
+        defer {
+            if shouldRemoveDestination { try? FileManager.default.removeItem(at: destinationURL) }
+        }
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+        try FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.complete],
+            ofItemAtPath: destinationURL.path
+        )
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var protectedURL = destinationURL
+        try protectedURL.setResourceValues(values)
+        shouldRemoveDestination = false
+        return destinationURL
+    }
+}
+
+enum PeerFileCryptor {
     private static let chunkSize = 1_048_576
     private static let maximumPlaintextSize: UInt64 = 512 * 1_024 * 1_024
     private static let maximumEncryptedSize: Int64 = 514 * 1_024 * 1_024

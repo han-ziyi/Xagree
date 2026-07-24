@@ -1,5 +1,8 @@
 import XCTest
+import CoreImage.CIFilterBuiltins
 import CoreVideo
+import CryptoKit
+import UIKit
 @testable import XAgree
 
 @MainActor
@@ -27,6 +30,20 @@ final class EvidenceCryptoTests: XCTestCase {
         XCTAssertEqual(first.split(separator: "\n").count, 2)
         XCTAssertTrue(first.contains("12345678"))
         XCTAssertTrue(first.contains("REC"))
+    }
+
+    func testQRCodeImageDecoderReadsGeneratedQRCode() throws {
+        let payload = "xagree-pairing-test-payload"
+        let filter = CIFilter.qrCodeGenerator()
+        filter.message = Data(payload.utf8)
+        guard let output = filter.outputImage?.transformed(by: CGAffineTransform(scaleX: 10, y: 10)) else {
+            return XCTFail("Failed to generate QR code")
+        }
+        let context = CIContext(options: [.useSoftwareRenderer: true])
+        let cgImage = try XCTUnwrap(context.createCGImage(output, from: output.extent))
+        let imageData = try XCTUnwrap(UIImage(cgImage: cgImage).pngData())
+
+        XCTAssertEqual(try QRCodeImageDecoder.decode(data: imageData), payload)
     }
 
     func testWatermarkRendererBurnsVisibleTextIntoFrame() throws {
@@ -421,6 +438,135 @@ private func countNearWhitePixels(in pixelBuffer: CVPixelBuffer) -> Int {
 
 @MainActor
 final class PeerPairingTests: XCTestCase {
+    func testBidirectionalRecordingPayloadRoundTripSurvivesCallbackCleanup() throws {
+        let sessionID = UUID()
+        let key = SymmetricKey(size: .bits256)
+        let authenticatedData = Data(sessionID.uuidString.utf8)
+        let sourceA = try AppFiles.temporaryURL(extension: "mp4")
+        let sourceB = try AppFiles.temporaryURL(extension: "mp4")
+        let payloadA = Data((0..<1_100_000).map { UInt8($0 % 241) })
+        let payloadB = Data((0..<1_250_000).map { UInt8(($0 * 3) % 239) })
+        try payloadA.write(to: sourceA)
+        try payloadB.write(to: sourceB)
+        var cleanupURLs = [sourceA, sourceB]
+        defer { cleanupURLs.forEach { EvidenceCryptor.remove($0) } }
+
+        let transferA = try PeerFileCryptor.seal(
+            inputURL: sourceA,
+            key: key,
+            authenticatedData: authenticatedData
+        )
+        let transferB = try PeerFileCryptor.seal(
+            inputURL: sourceB,
+            key: key,
+            authenticatedData: authenticatedData
+        )
+        cleanupURLs += [transferA, transferB]
+
+        let stagedAtB = try PeerResourceStager.stage(transferA)
+        let stagedAtA = try PeerResourceStager.stage(transferB)
+        cleanupURLs += [stagedAtA, stagedAtB]
+        EvidenceCryptor.remove(transferA)
+        EvidenceCryptor.remove(transferB)
+
+        let receivedAtB = try PeerFileCryptor.open(
+            inputURL: stagedAtB,
+            key: key,
+            authenticatedData: authenticatedData
+        )
+        let receivedAtA = try PeerFileCryptor.open(
+            inputURL: stagedAtA,
+            key: key,
+            authenticatedData: authenticatedData
+        )
+        cleanupURLs += [receivedAtA, receivedAtB]
+
+        XCTAssertEqual(try Data(contentsOf: receivedAtA), payloadB)
+        XCTAssertEqual(try Data(contentsOf: receivedAtB), payloadA)
+    }
+
+    func testReceivedResourceIsStagedBeforeSystemTemporaryFileDisappears() throws {
+        let source = try AppFiles.temporaryURL(extension: "peer-callback")
+        let payload = Data((0..<65_537).map { UInt8($0 % 251) })
+        try payload.write(to: source, options: .atomic)
+
+        let staged = try PeerResourceStager.stage(source)
+        defer {
+            EvidenceCryptor.remove(source)
+            EvidenceCryptor.remove(staged)
+        }
+        EvidenceCryptor.remove(source)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: source.path))
+        XCTAssertEqual(try Data(contentsOf: staged), payload)
+    }
+
+    func testRecordingReceiptMustMatchSessionRoleAndVideoHash() {
+        let sessionID = UUID()
+        let manifest = SegmentManifest(
+            role: .a,
+            duration: 5,
+            sha256: String(repeating: "a", count: 64),
+            watermark: RecordingWatermark(sessionID: sessionID, role: .a)
+        )
+        let receipt = RecordingReceipt(
+            sessionID: sessionID,
+            role: .a,
+            sha256: manifest.sha256.uppercased()
+        )
+
+        XCTAssertTrue(receipt.matches(sessionID: sessionID, localRole: .a, localManifest: manifest))
+        XCTAssertFalse(receipt.matches(sessionID: UUID(), localRole: .a, localManifest: manifest))
+        XCTAssertFalse(receipt.matches(sessionID: sessionID, localRole: .b, localManifest: manifest))
+        XCTAssertFalse(receipt.matches(sessionID: sessionID, localRole: .a, localManifest: nil))
+    }
+
+    func testDualTransferGateRequiresPeerReceiptBeforeAssembly() throws {
+        let local = try AppFiles.temporaryURL(extension: "mp4")
+        let remote = try AppFiles.temporaryURL(extension: "mp4")
+        try Data("local".utf8).write(to: local)
+        try Data("remote".utf8).write(to: remote)
+        defer {
+            EvidenceCryptor.remove(local)
+            EvidenceCryptor.remove(remote)
+        }
+        let manifest = SegmentManifest(
+            role: .b,
+            duration: 5,
+            sha256: String(repeating: "b", count: 64),
+            watermark: RecordingWatermark(sessionID: UUID(), role: .b)
+        )
+
+        XCTAssertFalse(DualTransferGate.canAssemble(
+            localURL: local,
+            remoteURL: remote,
+            remoteManifest: manifest,
+            peerAcknowledgedLocalRecording: false
+        ))
+        XCTAssertTrue(DualTransferGate.canAssemble(
+            localURL: local,
+            remoteURL: remote,
+            remoteManifest: manifest,
+            peerAcknowledgedLocalRecording: true
+        ))
+    }
+
+    func testDualRecordingRequiresActivePairing() {
+        let coordinator = PeerSessionCoordinator(
+            profile: ParticipantProfile(name: "Alice", avatarData: nil)
+        )
+        let model = DualSessionModel(
+            profile: ParticipantProfile(name: "Alice", avatarData: nil),
+            coordinator: coordinator
+        )
+
+        model.markReady()
+
+        XCTAssertEqual(model.stage, .ready)
+        XCTAssertEqual(model.sessionPhase, .draft)
+        XCTAssertNotNil(model.error)
+    }
+
     func testRecoveryPairingRejectsDifferentSession() throws {
         let invitation = PairingInvitation(
             version: 1,

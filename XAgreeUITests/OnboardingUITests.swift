@@ -307,7 +307,7 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["方式"].exists)
 
         waitTap("encryption.autofillVault")
-        XCTAssertEqual(element("encryption.autofillVault").label, "总密码已填入")
+        XCTAssertEqual(element("encryption.autofillVault").label, "私密空间密码已填入")
         XCTAssertTrue(element("encryption.encrypt").isEnabled)
     }
 
@@ -375,6 +375,20 @@ final class OnboardingUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["双机记录"].waitForExistence(timeout: 5))
         XCTAssertTrue(element("dual.host").waitForExistence(timeout: 3))
         XCTAssertTrue(element("dual.scan").exists)
+    }
+
+    func testDualScannerOffersSimulatorFallback() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Photo and text fallback controls are specific to the simulator scanner.")
+        #else
+        prepareApp()
+        launchSkipToHome()
+        waitTap("home.dual")
+        waitTap("dual.scan")
+
+        XCTAssertTrue(element("dual.scanner.import").waitForExistence(timeout: 5))
+        XCTAssertTrue(element("dual.scanner.text").exists)
+        #endif
     }
 
     func testHostingShowsCopyableQRCodeText() throws {
