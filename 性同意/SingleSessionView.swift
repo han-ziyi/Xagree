@@ -30,6 +30,7 @@ final class SingleSessionModel: ObservableObject {
     @Published var sessionPhase: SessionPhase = .draft
     private var segments: [ParticipantRole: Segment] = [:]
     private var completedSegmentManifests: [SegmentManifest] = []
+    private var hasCancelled = false
 
     init(owner: ParticipantProfile) {
         self.owner = owner
@@ -43,10 +44,16 @@ final class SingleSessionModel: ObservableObject {
         }
     }
 
+    nonisolated deinit {}
+
     func start() throws {
+        hasCancelled = false
         participantA = participantA.trimmingCharacters(in: .whitespacesAndNewlines)
         participantB = participantB.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !participantA.isEmpty, !participantB.isEmpty else { throw SessionFailure.missingParticipantName }
+        guard participantA.count <= 80, participantB.count <= 80 else {
+            throw SessionFailure.invalidParticipantName
+        }
         // 清理上一次失败残留的片段，避免文件泄漏与脏状态
         clearWorkingMedia()
         if sessionPhase == .failed || sessionPhase == .completed {
@@ -135,8 +142,13 @@ final class SingleSessionModel: ObservableObject {
         processingLabel = L10n.string("正在加密视频…")
         do {
             try transition(to: .encrypting)
-            let finalHash = try FileHasher.sha256Hex(of: finalVideoURL)
-            let avatarHash = owner.avatarData.map { FileHasher.sha256Hex(of: $0) }
+            let avatarData = owner.avatarData
+            let hashes = try await Task.detached(priority: .userInitiated) {
+                (
+                    video: try FileHasher.sha256Hex(of: finalVideoURL),
+                    avatar: avatarData.map { FileHasher.sha256Hex(of: $0) }
+                )
+            }.value
             let manifest = EvidenceManifest(
                 version: 1,
                 sessionID: sessionID,
@@ -144,18 +156,25 @@ final class SingleSessionModel: ObservableObject {
                 mode: .single,
                 participantNames: ["A": participantA, "B": participantB],
                 segments: completedSegmentManifests,
-                finalVideoSHA256: finalHash,
+                finalVideoSHA256: hashes.video,
                 appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                 profileSnapshots: [
-                    "A": ParticipantProfileSnapshot(name: participantA, avatarSHA256: avatarHash),
+                    "A": ParticipantProfileSnapshot(name: participantA, avatarSHA256: hashes.avatar),
                     "B": ParticipantProfileSnapshot(name: participantB, avatarSHA256: nil)
                 ]
             )
-            encryptedPackageURL = try EvidenceCryptor.seal(
-                videoURL: finalVideoURL,
-                manifest: manifest,
-                password: password
-            )
+            let package = try await Task.detached(priority: .userInitiated) {
+                try EvidenceCryptor.seal(
+                    videoURL: finalVideoURL,
+                    manifest: manifest,
+                    password: password
+                )
+            }.value
+            guard !hasCancelled else {
+                EvidenceCryptor.remove(package)
+                return
+            }
+            encryptedPackageURL = package
             EvidenceCryptor.remove(finalVideoURL)
             self.finalVideoURL = nil
             try transition(to: .awaitingExport)
@@ -221,6 +240,7 @@ final class SingleSessionModel: ObservableObject {
 
     @discardableResult
     func cancel() -> AppError? {
+        hasCancelled = true
         var cancellationError: AppError?
         var canReleasePackageReference = true
         // 导出阶段离开时保留草稿，不重复删除草稿路径中的文件
@@ -445,10 +465,12 @@ private struct RecordingView: View {
     let role: ParticipantRole
     @StateObject private var capture = CaptureService()
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var watermark: RecordingWatermark?
     @State private var started = false
     @State private var countdown = 3
     @State private var inCountdown = false
+    @State private var recordingTask: Task<Void, Never>?
     @State private var setupError: AppError?
 
     var body: some View {
@@ -529,22 +551,46 @@ private struct RecordingView: View {
         .alert(item: $setupError) { error in
             Alert(title: Text(error.title), message: Text(error.detail), dismissButton: .default(Text("知道了")) { dismiss() })
         }
-        .onDisappear { capture.stopSession() }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard RecordingInterruptionPolicy.shouldAbort(
+                scenePhase: newPhase,
+                hasStarted: started,
+                isCountingDown: inCountdown,
+                isRecording: capture.isRecording
+            ) else { return }
+            recordingTask?.cancel()
+            capture.cancelAndDelete()
+            dismiss()
+        }
+        .onDisappear {
+            recordingTask?.cancel()
+            capture.stopSession()
+        }
     }
 
     private func startCountdownAndRecord() {
+        guard !started, capture.isPrepared else { return }
         started = true
         inCountdown = true
-        Task {
+        recordingTask = Task {
+            defer { recordingTask = nil }
             for value in stride(from: 3, through: 1, by: -1) {
                 countdown = value
-                try? await Task.sleep(for: .seconds(1))
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    started = false
+                    inCountdown = false
+                    return
+                }
             }
             inCountdown = false
             let nextWatermark = model.watermark(for: role)
             watermark = nextWatermark
             do {
                 let artifact = try await capture.begin(CaptureRequest(watermark: nextWatermark))
+                // 录制完成后的校验属于流程模型，不应被录制页面的 onDisappear 取消。
+                recordingTask = nil
                 await model.recordingFinished(artifact: artifact, role: role)
             } catch {
                 if (error as? CaptureError) != .noRecording {

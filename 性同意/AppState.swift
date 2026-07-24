@@ -26,6 +26,17 @@ final class AppState: ObservableObject {
     @Published var exportDrafts: [ExportDraft] = []
 
     init() {
+        let startupCleanupError: AppError?
+        do {
+            try AppFiles.purgeTemporaryWorkFiles()
+            startupCleanupError = nil
+        } catch {
+            startupCleanupError = AppError(
+                title: "无法清理临时文件",
+                detail: error.localizedDescription
+            )
+        }
+
         let privacyDone = UserDefaults.standard.bool(forKey: onboardingPrivacyKey)
         let adultDone = UserDefaults.standard.bool(forKey: onboardingAdultKey)
 
@@ -38,6 +49,9 @@ final class AppState: ObservableObject {
                 preferredBackupMode = vaultStore.preferredBackupMode
                 phase = profile == nil ? .setupProfile : .home
                 refreshDrafts()
+                if transientError == nil {
+                    transientError = startupCleanupError
+                }
                 return
             } catch {
                 // 回落到正常启动路径
@@ -54,6 +68,9 @@ final class AppState: ObservableObject {
             phase = .setupVault
         }
         refreshDrafts()
+        if transientError == nil {
+            transientError = startupCleanupError
+        }
     }
 
     var passwordHint: String? {
@@ -93,7 +110,7 @@ final class AppState: ObservableObject {
     func saveProfile(_ profile: ParticipantProfile) throws {
         guard !profile.trimmedName.isEmpty,
               profile.trimmedName.count <= 80,
-              profile.avatarData?.count ?? 0 <= 1_048_576 else {
+              profile.avatarData.map(AvatarImageValidator.isSafeStoredAvatar) ?? true else {
             throw VaultError.invalidProfile
         }
         try vaultStore.saveProfile(profile, password: activePassword)

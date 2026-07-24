@@ -2,7 +2,7 @@ import CommonCrypto
 import CryptoKit
 import Foundation
 
-enum VaultError: LocalizedError {
+nonisolated enum VaultError: LocalizedError {
     case invalidPassword
     case passwordTooShort
     case passwordContainsInvalidCharacters
@@ -102,7 +102,13 @@ final class VaultStore {
         do {
             let box = try AES.GCM.SealedBox(combined: encryptedProfile)
             let data = try AES.GCM.open(box, using: key)
-            return try JSONDecoder().decode(ParticipantProfile.self, from: data)
+            let profile = try SafeJSONDecoder.decode(ParticipantProfile.self, from: data)
+            guard !profile.trimmedName.isEmpty,
+                  profile.trimmedName.count <= 80,
+                  profile.avatarData.map(AvatarImageValidator.isSafeStoredAvatar) ?? true else {
+                throw VaultError.corruptVault
+            }
+            return profile
         } catch {
             throw VaultError.corruptVault
         }
@@ -139,7 +145,14 @@ final class VaultStore {
     private func readVault() throws -> VaultFile {
         guard hasVault else { throw VaultError.missingVault }
         do {
-            let file = try JSONDecoder().decode(VaultFile.self, from: Data(contentsOf: AppFiles.vaultURL))
+            let size = try AppFiles.vaultURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            guard size > 0, size <= 2 * 1_024 * 1_024 else {
+                throw VaultError.corruptVault
+            }
+            let file = try SafeJSONDecoder.decode(
+                VaultFile.self,
+                from: Data(contentsOf: AppFiles.vaultURL)
+            )
             guard file.version == 1,
                   file.salt.count == 32,
                   (10_000...2_000_000).contains(file.rounds),
@@ -161,7 +174,7 @@ final class VaultStore {
     }
 }
 
-enum PasswordKeyDeriver {
+nonisolated enum PasswordKeyDeriver {
     static func derive(password: String, salt: Data, rounds: UInt32) throws -> SymmetricKey {
         var derived = [UInt8](repeating: 0, count: 32)
         let passwordLength = password.lengthOfBytes(using: .utf8)
@@ -185,7 +198,7 @@ enum PasswordKeyDeriver {
     }
 }
 
-enum AppFiles {
+nonisolated enum AppFiles {
     static var rootURL: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return base.appendingPathComponent("XAgree", isDirectory: true)
@@ -228,6 +241,53 @@ enum AppFiles {
         return workURL.appendingPathComponent(UUID().uuidString).appendingPathExtension(fileExtension)
     }
 
+    static func exportPackageFileName(
+        at date: Date = Date(),
+        timeZone: TimeZone = .current
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second],
+            from: date
+        )
+        return String(
+            format: "XAgree-%04d%02d%02d-%02d%02d%02d.xagree",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0,
+            components.hour ?? 0,
+            components.minute ?? 0,
+            components.second ?? 0
+        )
+    }
+
+    static func exportPackageURL(
+        in directory: URL? = nil,
+        at date: Date = Date()
+    ) throws -> URL {
+        try prepareDirectories()
+        let destinationDirectory = directory ?? workURL
+        let manager = FileManager.default
+        let defaultName = exportPackageFileName(at: date)
+        let stem = URL(fileURLWithPath: defaultName).deletingPathExtension().lastPathComponent
+        let fileExtension = URL(fileURLWithPath: defaultName).pathExtension
+        var candidate = destinationDirectory.appendingPathComponent(defaultName)
+        var suffix = 2
+        while manager.fileExists(atPath: candidate.path) {
+            candidate = destinationDirectory
+                .appendingPathComponent("\(stem)-\(suffix)")
+                .appendingPathExtension(fileExtension)
+            suffix += 1
+        }
+        return candidate
+    }
+
+    /// Work 只保存可重建的明文临时文件。每次冷启动都应清空，避免崩溃或强退后残留。
+    static func purgeTemporaryWorkFiles() throws {
+        try clearDirectory(workURL)
+    }
+
     static func protect(url: URL) throws {
         try FileManager.default.setAttributes(
             [.protectionKey: FileProtectionType.complete],
@@ -257,7 +317,7 @@ enum AppFiles {
     }
 }
 
-enum SecurityRandomError: LocalizedError {
+nonisolated enum SecurityRandomError: LocalizedError {
     case generationFailed
 
     var errorDescription: String? {
@@ -265,7 +325,7 @@ enum SecurityRandomError: LocalizedError {
     }
 }
 
-func randomData(count: Int) throws -> Data {
+nonisolated func randomData(count: Int) throws -> Data {
     var bytes = [UInt8](repeating: 0, count: count)
     guard SecRandomCopyBytes(kSecRandomDefault, count, &bytes) == errSecSuccess else {
         throw SecurityRandomError.generationFailed

@@ -1,7 +1,7 @@
 import CryptoKit
 import Foundation
 
-enum EvidenceCryptoError: LocalizedError {
+nonisolated enum EvidenceCryptoError: LocalizedError {
     case invalidPackage
     case unsupportedVersion
     case incorrectPassword
@@ -19,13 +19,13 @@ enum EvidenceCryptoError: LocalizedError {
     }
 }
 
-struct DecryptedEvidence {
+nonisolated struct DecryptedEvidence: Sendable {
     let manifest: EvidenceManifest
     let videoURL: URL
 }
 
 /// 明文头仅含容器元数据；清单与视频密文均经认证加密。
-private struct EvidencePackageHeader: Codable {
+private nonisolated struct EvidencePackageHeader: Codable, Sendable {
     let magic: String
     let version: Int
     let salt: Data
@@ -38,7 +38,7 @@ private struct EvidencePackageHeader: Codable {
     let encryptedManifest: Data
 }
 
-enum EvidenceCryptor {
+nonisolated enum EvidenceCryptor {
     private static let magic = "XAGR"
     private static let version = 1
     private static let chunkSize = 1_048_576
@@ -79,7 +79,7 @@ enum EvidenceCryptor {
             throw EvidenceCryptoError.invalidPackage
         }
 
-        let outputURL = try AppFiles.temporaryURL(extension: "xagree")
+        let outputURL = try AppFiles.exportPackageURL(at: manifest.createdAt)
         var shouldRemoveOutput = true
         defer {
             if shouldRemoveOutput { try? FileManager.default.removeItem(at: outputURL) }
@@ -145,7 +145,7 @@ enum EvidenceCryptor {
         let headerData = try readExactly(from: input, count: Int(headerLength))
         let header: EvidencePackageHeader
         do {
-            header = try JSONDecoder().decode(EvidencePackageHeader.self, from: headerData)
+            header = try SafeJSONDecoder.decode(EvidencePackageHeader.self, from: headerData)
         } catch {
             throw EvidenceCryptoError.invalidPackage
         }
@@ -181,7 +181,7 @@ enum EvidenceCryptor {
         let manifest: EvidenceManifest
         do {
             let encryptedManifest = try AES.GCM.SealedBox(combined: header.encryptedManifest)
-            manifest = try JSONDecoder().decode(
+            manifest = try SafeJSONDecoder.decode(
                 EvidenceManifest.self,
                 from: AES.GCM.open(encryptedManifest, using: contentKey, authenticating: aad)
             )
@@ -300,7 +300,7 @@ enum EvidenceCryptor {
     }
 }
 
-private extension FixedWidthInteger {
+private nonisolated extension FixedWidthInteger {
     var bigEndianData: Data {
         var value = bigEndian
         return Data(bytes: &value, count: MemoryLayout<Self>.size)

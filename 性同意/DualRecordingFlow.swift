@@ -15,6 +15,17 @@ enum DualTransferGate {
     }
 }
 
+enum DualPeerConnectionPolicy {
+    static func canContinueWithoutPeer(sessionPhase: SessionPhase) -> Bool {
+        switch sessionPhase {
+        case .assembling, .encrypting, .awaitingExport, .completed:
+            true
+        case .draft, .paired, .armed, .recording, .transferring, .failed:
+            false
+        }
+    }
+}
+
 @MainActor
 final class DualSessionModel: ObservableObject {
     enum Stage: Equatable {
@@ -44,6 +55,7 @@ final class DualSessionModel: ObservableObject {
     private var retainedRemoteManifest: SegmentManifest?
     private var finalVideoURL: URL?
     private var hasStartedAssembly = false
+    private var hasCancelled = false
     private var vaultPasswordForStaging: String = ""
     private var cancellables = Set<AnyCancellable>()
 
@@ -56,10 +68,24 @@ final class DualSessionModel: ObservableObject {
         }
 
         coordinator.$receivedRecordingURL
-            .combineLatest(
-                coordinator.$remoteSegmentManifest,
-                coordinator.$remoteAcknowledgedLocalRecording
-            )
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.peerDataChanged()
+                }
+            }
+            .store(in: &cancellables)
+
+        coordinator.$remoteSegmentManifest
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.peerDataChanged()
+                }
+            }
+            .store(in: &cancellables)
+
+        coordinator.$remoteAcknowledgedLocalRecording
             .dropFirst()
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -69,6 +95,8 @@ final class DualSessionModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    nonisolated deinit {}
+
     var localRole: ParticipantRole { coordinator.localRole ?? .a }
     var localName: String { profile.trimmedName }
     var remoteName: String { coordinator.remoteProfile?.name ?? L10n.string("对方") }
@@ -76,6 +104,10 @@ final class DualSessionModel: ObservableObject {
     var hasLocalSegment: Bool {
         guard let localSegment else { return false }
         return FileManager.default.fileExists(atPath: localSegment.url.path)
+    }
+    /// 双向视频均已接收并确认后，后续合成、加密和导出都只依赖本机数据。
+    var canContinueWithoutPeer: Bool {
+        DualPeerConnectionPolicy.canContinueWithoutPeer(sessionPhase: sessionPhase)
     }
     /// 中断恢复 UI：传输中/暂存恢复中
     var needsTransferRecoveryUI: Bool {
@@ -124,6 +156,7 @@ final class DualSessionModel: ObservableObject {
 
     func markReady() {
         do {
+            hasCancelled = false
             markPairedIfNeeded()
             guard coordinator.state == .paired else {
                 throw PeerPairingError.invalidState
@@ -175,7 +208,7 @@ final class DualSessionModel: ObservableObject {
             guard let sessionID = coordinator.currentSessionID, !vaultPasswordForStaging.isEmpty else {
                 throw SessionFailure.missingRecording
             }
-            try DraftStore.saveStaging(
+            try await DraftStore.saveStaging(
                 sessionID: sessionID,
                 role: localRole,
                 segmentURL: artifact.url,
@@ -183,7 +216,7 @@ final class DualSessionModel: ObservableObject {
                 vaultPassword: vaultPasswordForStaging
             )
             stagingSucceeded = true
-            try coordinator.sendRecording(artifact.url, manifest: manifest)
+            try await coordinator.sendRecording(artifact.url, manifest: manifest)
             stage = .waitingForPeer
             await assembleIfReady()
         } catch {
@@ -216,6 +249,8 @@ final class DualSessionModel: ObservableObject {
     }
 
     func handleDisconnectAfterRecording() {
+        // 双向传输已完成时，断开只结束后台连接，不能打断本机的保存流程。
+        guard !canContinueWithoutPeer else { return }
         // 仅在仍有待传输明文片段时进入恢复（合成后 hasLocalSegment 为 false）
         guard hasLocalSegment || stage == .waitingForPeer || stage == .recoverStaging else { return }
         stage = .recoverStaging
@@ -238,7 +273,7 @@ final class DualSessionModel: ObservableObject {
                 return
             }
             do {
-                guard let restored = try DraftStore.loadStaging(
+                guard let restored = try await DraftStore.loadStaging(
                     sessionID: sessionID,
                     vaultPassword: vaultPasswordForStaging
                 ) else {
@@ -271,7 +306,7 @@ final class DualSessionModel: ObservableObject {
             if sessionPhase == .draft || sessionPhase == .failed {
                 sessionPhase = .transferring
             }
-            try coordinator.sendRecording(local.url, manifest: local.manifest)
+            try await coordinator.sendRecording(local.url, manifest: local.manifest)
             stage = .waitingForPeer
             await assembleIfReady()
         } catch {
@@ -292,7 +327,13 @@ final class DualSessionModel: ObservableObject {
         stage = .processing(L10n.string("正在加密本机副本…"))
         do {
             try transition(to: .encrypting)
-            let finalHash = try FileHasher.sha256Hex(of: finalVideoURL)
+            let avatarData = profile.avatarData
+            let hashes = try await Task.detached(priority: .userInitiated) {
+                (
+                    video: try FileHasher.sha256Hex(of: finalVideoURL),
+                    avatar: avatarData.map { FileHasher.sha256Hex(of: $0) }
+                )
+            }.value
             guard let own = localSegment?.manifest,
                   let remote = retainedRemoteManifest ?? coordinator.remoteSegmentManifest else {
                 throw SessionFailure.missingRecording
@@ -303,7 +344,7 @@ final class DualSessionModel: ObservableObject {
                 : ["A": remoteName, "B": localName]
             let localSnap = ParticipantProfileSnapshot(
                 name: localName,
-                avatarSHA256: profile.avatarData.map { FileHasher.sha256Hex(of: $0) }
+                avatarSHA256: hashes.avatar
             )
             let remoteSnap = ParticipantProfileSnapshot(
                 name: remoteName,
@@ -319,15 +360,22 @@ final class DualSessionModel: ObservableObject {
                 mode: .dual,
                 participantNames: names,
                 segments: orderedSegments,
-                finalVideoSHA256: finalHash,
+                finalVideoSHA256: hashes.video,
                 appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                 profileSnapshots: snapshots
             )
-            encryptedPackageURL = try EvidenceCryptor.seal(
-                videoURL: finalVideoURL,
-                manifest: manifest,
-                password: password
-            )
+            let package = try await Task.detached(priority: .userInitiated) {
+                try EvidenceCryptor.seal(
+                    videoURL: finalVideoURL,
+                    manifest: manifest,
+                    password: password
+                )
+            }.value
+            guard !hasCancelled else {
+                EvidenceCryptor.remove(package)
+                return
+            }
+            encryptedPackageURL = package
             EvidenceCryptor.remove(finalVideoURL)
             self.finalVideoURL = nil
             if let sessionID = coordinator.currentSessionID {
@@ -397,11 +445,13 @@ final class DualSessionModel: ObservableObject {
 
     @discardableResult
     func cancel(clearStaging: Bool = true) -> AppError? {
+        hasCancelled = true
         var issueDetails: [String] = []
         var canReleasePackageReference = true
+        // 暂存区只含加密副本；无论是否保留暂存，都不能把本机明文片段留在 Work。
+        EvidenceCryptor.remove(localSegment?.url)
+        localSegment = nil
         if clearStaging {
-            EvidenceCryptor.remove(localSegment?.url)
-            localSegment = nil
             let stagingID = coordinator.currentSessionID ?? DraftStore.activeStagingSessionID()
             if let stagingID {
                 do {
@@ -638,6 +688,8 @@ private struct DualConsentView: View {
 private struct DualCaptureView: View {
     @ObservedObject var model: DualSessionModel
     @StateObject private var capture = CaptureService()
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var started = false
     @State private var isCountingDown = false
     @State private var recordingTask: Task<Void, Never>?
@@ -723,6 +775,17 @@ private struct DualCaptureView: View {
             recordingTask?.cancel()
             capture.stopSession()
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard RecordingInterruptionPolicy.shouldAbort(
+                scenePhase: newPhase,
+                hasStarted: started,
+                isCountingDown: isCountingDown,
+                isRecording: capture.isRecording
+            ) else { return }
+            recordingTask?.cancel()
+            capture.cancelAndDelete()
+            dismiss()
+        }
         .alert(item: $setupError) { error in
             Alert(title: Text(error.title), message: Text(error.detail), dismissButton: .default(Text("知道了")))
         }
@@ -750,6 +813,8 @@ private struct DualCaptureView: View {
             do {
                 try model.markRecordingStarted()
                 let artifact = try await capture.begin(CaptureRequest(watermark: nextWatermark))
+                // 录制完成后的校验/暂存属于流程模型，不应被录制页面的 onDisappear 取消。
+                recordingTask = nil
                 await model.recordingFinished(artifact: artifact)
             } catch {
                 if (error as? CaptureError) != .noRecording {

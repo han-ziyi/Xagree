@@ -7,6 +7,116 @@ import UIKit
 
 @MainActor
 final class EvidenceCryptoTests: XCTestCase {
+    func testExportPackageFileNameUsesLocalDateAndTime() throws {
+        let date = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T15:30:45Z")
+        )
+
+        XCTAssertEqual(
+            AppFiles.exportPackageFileName(
+                at: date,
+                timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+            ),
+            "XAgree-20260724-153045.xagree"
+        )
+    }
+
+    func testSafeJSONRejectsInvalidUTF8BeforeFoundationDecode() {
+        XCTAssertThrowsError(
+            try SafeJSONDecoder.decode([String: String].self, from: Data([0xFF]))
+        )
+    }
+
+    func testUITestBootstrapCannotRunInReleaseConfiguration() {
+        let arguments = [
+            UITestBootstrap.testingFlag,
+            UITestBootstrap.resetFlag,
+            UITestBootstrap.skipToHomeFlag
+        ]
+        XCTAssertFalse(UITestBootstrap.permitsTesting(arguments: arguments, debugBuild: false))
+        XCTAssertTrue(UITestBootstrap.permitsTesting(arguments: arguments, debugBuild: true))
+        XCTAssertFalse(
+            UITestBootstrap.permitsTesting(
+                arguments: [UITestBootstrap.resetFlag, UITestBootstrap.skipToHomeFlag],
+                debugBuild: true
+            )
+        )
+    }
+
+    func testAppUsesSingleSceneToProtectSharedVaultState() {
+        let manifest = Bundle.main.object(forInfoDictionaryKey: "UIApplicationSceneManifest") as? [String: Any]
+        XCTAssertEqual(manifest?["UIApplicationSupportsMultipleScenes"] as? Bool, false)
+    }
+
+    func testIPadDeclaresEveryWindowOrientation() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { return }
+        let infoData = try Data(
+            contentsOf: Bundle.main.bundleURL.appendingPathComponent("Info.plist")
+        )
+        let info = try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: infoData, format: nil)
+                as? [String: Any]
+        )
+        let orientations = info["UISupportedInterfaceOrientations~ipad"] as? [String]
+        XCTAssertEqual(
+            Set(orientations ?? []),
+            [
+                "UIInterfaceOrientationPortrait",
+                "UIInterfaceOrientationPortraitUpsideDown",
+                "UIInterfaceOrientationLandscapeLeft",
+                "UIInterfaceOrientationLandscapeRight"
+            ]
+        )
+    }
+
+    func testStartupPurgesOnlyPlaintextWorkFiles() throws {
+        try AppFiles.prepareDirectories()
+        let workFile = AppFiles.workURL.appendingPathComponent("startup-cleanup-\(UUID().uuidString).mp4")
+        let draftFile = AppFiles.draftsURL.appendingPathComponent("startup-cleanup-\(UUID().uuidString).xagr")
+        let stagingFile = AppFiles.stagingURL.appendingPathComponent("startup-cleanup-\(UUID().uuidString).stage")
+        defer {
+            EvidenceCryptor.remove(workFile)
+            EvidenceCryptor.remove(draftFile)
+            EvidenceCryptor.remove(stagingFile)
+        }
+        try Data("plaintext".utf8).write(to: workFile)
+        try Data("encrypted-draft".utf8).write(to: draftFile)
+        try Data("encrypted-staging".utf8).write(to: stagingFile)
+
+        try AppFiles.purgeTemporaryWorkFiles()
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: workFile.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: draftFile.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: stagingFile.path))
+    }
+
+    func testRecordingAbortsOnlyAfterCaptureStartsAndAppLeavesForeground() {
+        XCTAssertFalse(RecordingInterruptionPolicy.shouldAbort(
+            scenePhase: .active,
+            hasStarted: true,
+            isCountingDown: false,
+            isRecording: true
+        ))
+        XCTAssertFalse(RecordingInterruptionPolicy.shouldAbort(
+            scenePhase: .inactive,
+            hasStarted: false,
+            isCountingDown: false,
+            isRecording: false
+        ))
+        XCTAssertTrue(RecordingInterruptionPolicy.shouldAbort(
+            scenePhase: .inactive,
+            hasStarted: true,
+            isCountingDown: true,
+            isRecording: false
+        ))
+        XCTAssertTrue(RecordingInterruptionPolicy.shouldAbort(
+            scenePhase: .background,
+            hasStarted: true,
+            isCountingDown: false,
+            isRecording: true
+        ))
+    }
+
     func testConsentStatementWordingIsFixed() {
         XCTAssertEqual(
             ConsentStatement.format,
@@ -44,6 +154,11 @@ final class EvidenceCryptoTests: XCTestCase {
         let imageData = try XCTUnwrap(UIImage(cgImage: cgImage).pngData())
 
         XCTAssertEqual(try QRCodeImageDecoder.decode(data: imageData), payload)
+    }
+
+    func testQRCodeImageDecoderRejectsOversizedInputBeforeImageDecode() {
+        let oversized = Data(repeating: 0, count: QRCodeImageDecoder.maximumInputSize + 1)
+        XCTAssertThrowsError(try QRCodeImageDecoder.decode(data: oversized))
     }
 
     func testWatermarkRendererBurnsVisibleTextIntoFrame() throws {
@@ -185,7 +300,7 @@ final class EvidenceCryptoTests: XCTestCase {
         }
     }
 
-    func testStagingRejectsTamperedMetadata() throws {
+    func testStagingRejectsTamperedMetadata() async throws {
         let video = try makeSampleVideoData()
         let sessionID = UUID()
         let password = "staging-password-12"
@@ -201,7 +316,7 @@ final class EvidenceCryptoTests: XCTestCase {
             try? DraftStore.clearStaging(sessionID: sessionID)
         }
 
-        try DraftStore.saveStaging(
+        try await DraftStore.saveStaging(
             sessionID: sessionID,
             role: .a,
             segmentURL: video,
@@ -228,14 +343,15 @@ final class EvidenceCryptoTests: XCTestCase {
         )
         try JSONEncoder().encode(tamperedRecord).write(to: metadataURL, options: .atomic)
 
-        XCTAssertThrowsError(
-            try DraftStore.loadStaging(sessionID: sessionID, vaultPassword: password)
-        ) { error in
+        do {
+            _ = try await DraftStore.loadStaging(sessionID: sessionID, vaultPassword: password)
+            XCTFail("Tampered staging metadata must be rejected")
+        } catch {
             XCTAssertEqual(error as? EvidenceCryptoError, .tamperedPackage)
         }
     }
 
-    func testDualWorkflowRestoresStagedSessionIdentity() throws {
+    func testDualWorkflowRestoresStagedSessionIdentity() async throws {
         let video = try makeSampleVideoData()
         let sessionID = UUID()
         let password = "staging-password-12"
@@ -250,7 +366,7 @@ final class EvidenceCryptoTests: XCTestCase {
             try? DraftStore.clearStaging(sessionID: sessionID)
         }
 
-        try DraftStore.saveStaging(
+        try await DraftStore.saveStaging(
             sessionID: sessionID,
             role: .a,
             segmentURL: video,
@@ -268,6 +384,67 @@ final class EvidenceCryptoTests: XCTestCase {
         XCTAssertEqual(model.stage, .recoverStaging)
         XCTAssertEqual(model.sessionPhase, .transferring)
         XCTAssertEqual(try model.prepareForPairing(), sessionID)
+    }
+
+    func testStagingReplacementCommitsNewPackageBeforeRemovingOldOne() async throws {
+        let firstVideo = try makeSampleVideoData(size: 8_192)
+        let secondVideo = try makeSampleVideoData(size: 12_288)
+        let sessionID = UUID()
+        let password = "staging-password-12"
+        let metadataURL = AppFiles.stagingURL.appendingPathComponent("\(sessionID.uuidString).json")
+        defer {
+            EvidenceCryptor.remove(firstVideo)
+            EvidenceCryptor.remove(secondVideo)
+            try? DraftStore.clearStaging(sessionID: sessionID)
+        }
+
+        let firstManifest = SegmentManifest(
+            role: .a,
+            duration: 5,
+            sha256: try FileHasher.sha256Hex(of: firstVideo),
+            watermark: RecordingWatermark(sessionID: sessionID, role: .a)
+        )
+        try await DraftStore.saveStaging(
+            sessionID: sessionID,
+            role: .a,
+            segmentURL: firstVideo,
+            manifest: firstManifest,
+            vaultPassword: password
+        )
+        let firstRecord = try JSONDecoder().decode(
+            DraftStore.StagingRecord.self,
+            from: Data(contentsOf: metadataURL)
+        )
+        let firstPackageURL = AppFiles.stagingURL.appendingPathComponent(firstRecord.fileName)
+
+        let secondManifest = SegmentManifest(
+            role: .a,
+            duration: 6,
+            sha256: try FileHasher.sha256Hex(of: secondVideo),
+            watermark: RecordingWatermark(sessionID: sessionID, role: .a)
+        )
+        try await DraftStore.saveStaging(
+            sessionID: sessionID,
+            role: .a,
+            segmentURL: secondVideo,
+            manifest: secondManifest,
+            vaultPassword: password
+        )
+        let secondRecord = try JSONDecoder().decode(
+            DraftStore.StagingRecord.self,
+            from: Data(contentsOf: metadataURL)
+        )
+
+        XCTAssertNotEqual(firstRecord.fileName, secondRecord.fileName)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: firstPackageURL.path))
+        let loaded = try await DraftStore.loadStaging(
+            sessionID: sessionID,
+            vaultPassword: password
+        )
+        let restored = try XCTUnwrap(loaded)
+        defer { EvidenceCryptor.remove(restored.url) }
+        XCTAssertEqual(try Data(contentsOf: restored.url), try Data(contentsOf: secondVideo))
+        XCTAssertEqual(restored.manifest, secondManifest)
     }
 
     func testCorruptDraftIndexDoesNotDeleteSourcePackage() throws {
@@ -366,6 +543,17 @@ final class EvidenceCryptoTests: XCTestCase {
 
 @MainActor
 final class SessionPhaseTests: XCTestCase {
+    func testSingleSessionRejectsOverlongParticipantNames() {
+        let model = SingleSessionModel(owner: ParticipantProfile(name: "Alice", avatarData: nil))
+        model.participantB = String(repeating: "B", count: 81)
+
+        XCTAssertThrowsError(try model.start()) { error in
+            guard case .invalidParticipantName = error as? SessionFailure else {
+                return XCTFail("Expected invalidParticipantName, got \(error)")
+            }
+        }
+    }
+
     func testLegalTransitions() {
         XCTAssertTrue(SessionPhase.draft.canTransition(to: .armed))
         XCTAssertTrue(SessionPhase.armed.canTransition(to: .recording))
@@ -438,6 +626,44 @@ private func countNearWhitePixels(in pixelBuffer: CVPixelBuffer) -> Int {
 
 @MainActor
 final class PeerPairingTests: XCTestCase {
+    func testIncomingResourceSizeIsCheckedBeforeStaging() throws {
+        let source = try AppFiles.temporaryURL(extension: "peer-oversized")
+        defer { EvidenceCryptor.remove(source) }
+        try Data(repeating: 0xA5, count: 65).write(to: source)
+
+        XCTAssertThrowsError(try PeerResourceStager.stage(source, maximumSize: 64)) { error in
+            XCTAssertEqual(error as? PeerPairingError, .invalidPeerMessage)
+        }
+    }
+
+    func testPairedProfileRequiresMatchingAvatarHash() {
+        let avatar = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")!
+        let hash = SHA256.hash(data: avatar).map { String(format: "%02x", $0) }.joined()
+
+        XCTAssertTrue(PeerProtocolLimits.isValidProfile(
+            PairedProfile(name: "Alice", avatarData: avatar, avatarHash: hash.uppercased())
+        ))
+        XCTAssertFalse(PeerProtocolLimits.isValidProfile(
+            PairedProfile(name: "Alice", avatarData: avatar, avatarHash: String(repeating: "0", count: 64))
+        ))
+        XCTAssertFalse(PeerProtocolLimits.isValidProfile(
+            PairedProfile(name: "Alice", avatarData: nil, avatarHash: hash)
+        ))
+        XCTAssertFalse(PeerProtocolLimits.isValidProfile(
+            PairedProfile(
+                name: "Alice",
+                avatarData: Data("not-an-image".utf8),
+                avatarHash: FileHasher.sha256Hex(of: Data("not-an-image".utf8))
+            )
+        ))
+    }
+
+    func testOversizedPairingInvitationIsRejectedBeforeDecoding() {
+        XCTAssertThrowsError(try PairingInvitation.decode(String(repeating: "A", count: 4097))) { error in
+            XCTAssertEqual(error as? PeerPairingError, .invalidInvitation)
+        }
+    }
+
     func testBidirectionalRecordingPayloadRoundTripSurvivesCallbackCleanup() throws {
         let sessionID = UUID()
         let key = SymmetricKey(size: .bits256)
@@ -549,6 +775,38 @@ final class PeerPairingTests: XCTestCase {
             remoteManifest: manifest,
             peerAcknowledgedLocalRecording: true
         ))
+    }
+
+    func testDualSaveFlowRemainsVisibleAfterPeerDisconnectOnceTransferCompleted() {
+        for phase in [
+            SessionPhase.assembling,
+            .encrypting,
+            .awaitingExport,
+            .completed
+        ] {
+            XCTAssertTrue(
+                DualPeerConnectionPolicy.canContinueWithoutPeer(sessionPhase: phase),
+                "\(phase) should no longer depend on the peer connection"
+            )
+        }
+        XCTAssertFalse(
+            DualPeerConnectionPolicy.canContinueWithoutPeer(sessionPhase: .transferring)
+        )
+
+        XCTAssertTrue(
+            DualSessionPresentationPolicy.usesStandaloneFlowLayout(
+                stage: .export,
+                isPeerPaired: false,
+                canContinueWithoutPeer: true
+            )
+        )
+        XCTAssertFalse(
+            DualSessionPresentationPolicy.usesStandaloneFlowLayout(
+                stage: .waitingForPeer,
+                isPeerPaired: false,
+                canContinueWithoutPeer: false
+            )
+        )
     }
 
     func testDualRecordingRequiresActivePairing() {
