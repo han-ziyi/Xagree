@@ -1,6 +1,18 @@
 import Foundation
+import ImageIO
 
-enum ConsentStatement {
+nonisolated enum SafeJSONDecoder {
+    static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        guard String(data: data, encoding: .utf8) != nil else {
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: [], debugDescription: "JSON is not valid UTF-8.")
+            )
+        }
+        return try JSONDecoder().decode(type, from: data)
+    }
+}
+
+nonisolated enum ConsentStatement {
     // Product-approved fixed wording. Only the two participant names may be substituted.
     static let format = "我叫 %@，我已经成年，我同意并自愿与 %@ 发生性关系，我意识清醒，没有受到任何形式的胁迫。"
 
@@ -9,7 +21,7 @@ enum ConsentStatement {
     }
 }
 
-enum PasswordPolicy {
+nonisolated enum PasswordPolicy {
     enum ValidationIssue: Equatable {
         case tooShort
         case invalidCharacters
@@ -30,7 +42,7 @@ enum PasswordPolicy {
     }
 }
 
-private extension Unicode.Scalar {
+private nonisolated extension Unicode.Scalar {
     var isASCIIAlphanumeric: Bool {
         switch value {
         case 48...57, 65...90, 97...122:
@@ -41,7 +53,7 @@ private extension Unicode.Scalar {
     }
 }
 
-struct ParticipantProfile: Codable, Equatable, Sendable {
+nonisolated struct ParticipantProfile: Codable, Equatable, Sendable {
     var name: String
     var avatarData: Data?
 
@@ -50,7 +62,28 @@ struct ParticipantProfile: Codable, Equatable, Sendable {
     }
 }
 
-enum BackupMode: String, Codable, CaseIterable, Identifiable, Sendable {
+nonisolated enum AvatarImageValidator {
+    static func isSafeStoredAvatar(_ data: Data) -> Bool {
+        guard !data.isEmpty,
+              data.count <= 1_048_576,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetCount(source) == 1,
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+              let height = properties[kCGImagePropertyPixelHeight] as? NSNumber else {
+            return false
+        }
+        let pixelWidth = width.intValue
+        let pixelHeight = height.intValue
+        return pixelWidth > 0
+            && pixelHeight > 0
+            && pixelWidth <= 512
+            && pixelHeight <= 512
+            && pixelWidth * pixelHeight <= 262_144
+    }
+}
+
+nonisolated enum BackupMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case single
     case dual
 
@@ -71,7 +104,7 @@ enum BackupMode: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum ParticipantRole: String, Codable, CaseIterable, Sendable {
+nonisolated enum ParticipantRole: String, Codable, CaseIterable, Sendable {
     case a = "A"
     case b = "B"
 
@@ -83,7 +116,7 @@ enum ParticipantRole: String, Codable, CaseIterable, Sendable {
 }
 
 /// 会话阶段仅允许合法迁移；非法迁移由协调器拒绝。
-enum SessionPhase: String, Codable, Sendable, Equatable {
+nonisolated enum SessionPhase: String, Codable, Sendable, Equatable {
     case draft
     case paired
     case armed
@@ -125,7 +158,7 @@ enum SessionPhase: String, Codable, Sendable, Equatable {
     }
 }
 
-struct RecordingWatermark: Codable, Sendable, Equatable {
+nonisolated struct RecordingWatermark: Codable, Sendable, Equatable {
     let sessionID: UUID
     let role: ParticipantRole
     let recordedAt: Date
@@ -152,14 +185,14 @@ struct RecordingWatermark: Codable, Sendable, Equatable {
     }
 }
 
-struct SegmentManifest: Codable, Sendable, Equatable {
+nonisolated struct SegmentManifest: Codable, Sendable, Equatable {
     let role: ParticipantRole
     let duration: TimeInterval
     let sha256: String
     let watermark: RecordingWatermark
 }
 
-struct EvidenceManifest: Codable, Sendable {
+nonisolated struct EvidenceManifest: Codable, Sendable {
     let version: Int
     let sessionID: UUID
     let createdAt: Date
@@ -172,19 +205,19 @@ struct EvidenceManifest: Codable, Sendable {
     let profileSnapshots: [String: ParticipantProfileSnapshot]?
 }
 
-struct ParticipantProfileSnapshot: Codable, Sendable, Equatable {
+nonisolated struct ParticipantProfileSnapshot: Codable, Sendable, Equatable {
     let name: String
     let avatarSHA256: String?
 }
 
-struct CaptureArtifact: Sendable {
+nonisolated struct CaptureArtifact: Sendable {
     let url: URL
     let duration: TimeInterval
     let sha256: String
     let watermark: RecordingWatermark
 }
 
-enum PasswordProtection: Sendable {
+nonisolated enum PasswordProtection: Sendable {
     case vaultPassword(String)
     case oneTimePassword(String)
 
@@ -196,7 +229,7 @@ enum PasswordProtection: Sendable {
     }
 }
 
-struct ExportDraft: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct ExportDraft: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let fileName: String
     let createdAt: Date
@@ -204,8 +237,9 @@ struct ExportDraft: Identifiable, Codable, Equatable, Sendable {
     let relativePath: String
 }
 
-enum SessionFailure: LocalizedError {
+nonisolated enum SessionFailure: LocalizedError {
     case missingParticipantName
+    case invalidParticipantName
     case missingRecording
     case incompatibleVideo
     case illegalTransition(from: SessionPhase, to: SessionPhase)
@@ -215,6 +249,7 @@ enum SessionFailure: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingParticipantName: L10n.string("请填写两位参与者的姓名。")
+        case .invalidParticipantName: L10n.string("姓名或头像数据无效。")
         case .missingRecording: L10n.string("未找到完成的录制文件。")
         case .incompatibleVideo: L10n.string("视频文件无法合成。")
         case .illegalTransition(let from, let to):

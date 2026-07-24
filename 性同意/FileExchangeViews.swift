@@ -44,6 +44,7 @@ struct EvidenceImportView: View {
     @State private var evidence: DecryptedEvidence?
     @State private var error: AppError?
     @State private var isDecrypting = false
+    @State private var decryptionTask: Task<Void, Never>?
 
     var body: some View {
         Group {
@@ -86,28 +87,38 @@ struct EvidenceImportView: View {
         .alert(item: $error) { error in
             Alert(title: Text(error.title), message: Text(error.detail), dismissButton: .default(Text("知道了")))
         }
+        .onDisappear {
+            decryptionTask?.cancel()
+        }
     }
 
     private func decrypt() {
         guard let selectedURL else { return }
+        let submittedPassword = password
         isDecrypting = true
-        Task {
+        decryptionTask = Task {
+            defer { decryptionTask = nil }
             let hasAccess = selectedURL.startAccessingSecurityScopedResource()
             defer {
                 if hasAccess { selectedURL.stopAccessingSecurityScopedResource() }
             }
             do {
-                let decrypted = try EvidenceCryptor.open(packageURL: selectedURL, password: password)
-                await MainActor.run {
-                    evidence = decrypted
-                    password.removeAll()
+                let decrypted = try await Task.detached(priority: .userInitiated) {
+                    try EvidenceCryptor.open(packageURL: selectedURL, password: submittedPassword)
+                }.value
+                guard !Task.isCancelled else {
+                    EvidenceCryptor.remove(decrypted.videoURL)
                     isDecrypting = false
+                    return
                 }
+                evidence = decrypted
+                password.removeAll()
+                isDecrypting = false
             } catch {
-                await MainActor.run {
+                if !Task.isCancelled {
                     self.error = AppError(title: "无法解锁文件", detail: error.localizedDescription)
-                    isDecrypting = false
                 }
+                isDecrypting = false
             }
         }
     }

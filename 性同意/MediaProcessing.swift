@@ -89,7 +89,7 @@ enum MediaProcessor {
     }
 }
 
-enum FileHasher {
+nonisolated enum FileHasher {
     static func sha256Hex(of url: URL) throws -> String {
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }

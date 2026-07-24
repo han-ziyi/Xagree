@@ -8,16 +8,23 @@ enum UITestBootstrap {
     static let singleProtectFlag = "-UITestingSingleProtect"
     static let singleCompletionFlag = "-UITestingSingleCompletion"
 
+    static func permitsTesting(arguments: [String], debugBuild: Bool) -> Bool {
+        debugBuild && arguments.contains(testingFlag)
+    }
+
     static var isUITesting: Bool {
-        ProcessInfo.processInfo.arguments.contains(testingFlag)
+        permitsTesting(
+            arguments: ProcessInfo.processInfo.arguments,
+            debugBuild: _isDebugAssertConfiguration()
+        )
     }
 
     static var shouldReset: Bool {
-        ProcessInfo.processInfo.arguments.contains(resetFlag)
+        isUITesting && ProcessInfo.processInfo.arguments.contains(resetFlag)
     }
 
     static var shouldSkipToHome: Bool {
-        ProcessInfo.processInfo.arguments.contains(skipToHomeFlag)
+        isUITesting && ProcessInfo.processInfo.arguments.contains(skipToHomeFlag)
     }
 
     static var shouldShowSingleProtect: Bool {

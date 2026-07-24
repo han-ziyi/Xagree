@@ -3,7 +3,7 @@ import Combine
 import CryptoKit
 import Foundation
 
-enum PeerPairingError: LocalizedError, Equatable {
+nonisolated enum PeerPairingError: LocalizedError, Equatable {
     case invalidInvitation
     case invalidPeerMessage
     case keyAgreementFailed
@@ -39,7 +39,7 @@ struct PairingInvitation: Codable, Sendable {
               let data = Data(base64Encoded: normalized) else {
             throw PeerPairingError.invalidInvitation
         }
-        let invitation = try JSONDecoder().decode(PairingInvitation.self, from: data)
+        let invitation = try SafeJSONDecoder.decode(PairingInvitation.self, from: data)
         guard invitation.version == 1,
               invitation.hostPeerID.count <= 128,
               !invitation.hostPeerID.isEmpty,
@@ -54,6 +54,33 @@ struct PairedProfile: Codable, Equatable {
     let name: String
     let avatarData: Data?
     let avatarHash: String?
+}
+
+enum PeerProtocolLimits {
+    static let maximumWireMessageSize = 3 * 1_024 * 1_024
+    static let maximumWirePayloadSize = 2 * 1_024 * 1_024
+    static let maximumPlaintextPayloadSize = 1_500_000
+
+    static func isValidProfile(_ profile: PairedProfile) -> Bool {
+        let normalizedName = profile.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedName.isEmpty,
+              normalizedName == profile.name,
+              normalizedName.count <= 80,
+              profile.avatarData?.count ?? 0 <= 1_048_576 else {
+            return false
+        }
+        switch (profile.avatarData, profile.avatarHash) {
+        case (nil, nil):
+            return true
+        case let (data?, hash?):
+            let actual = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            return AvatarImageValidator.isSafeStoredAvatar(data)
+                && hash.count == 64
+                && hash.caseInsensitiveCompare(actual) == .orderedSame
+        default:
+            return false
+        }
+    }
 }
 
 private struct PeerWireMessage: Codable {
@@ -128,6 +155,7 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
     private var sessionKey: SymmetricKey?
     private var sessionID: UUID?
     private var joinedInvitation: PairingInvitation?
+    private var expectedRemotePeerID: MCPeerID?
     private var sentSegmentManifest: SegmentManifest?
     private var acknowledgedRemoteSegmentSHA256: String?
 
@@ -202,11 +230,20 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         updateConfirmedState()
     }
 
-    func sendRecording(_ recordingURL: URL, manifest: SegmentManifest) throws {
+    func sendRecording(_ recordingURL: URL, manifest: SegmentManifest) async throws {
+        guard state == .paired,
+              manifest.role == localRole,
+              manifest.duration > 0,
+              manifest.duration <= 30.5,
+              manifest.sha256.count == 64,
+              manifest.sha256.allSatisfy(\.isHexDigit) else {
+            throw PeerPairingError.invalidState
+        }
         guard let sessionKey, let session, let sessionID else {
             throw PeerPairingError.keyAgreementFailed
         }
-        guard let peer = session.connectedPeers.first else {
+        guard let peer = expectedRemotePeerID,
+              session.connectedPeers.contains(peer) else {
             throw PeerPairingError.localNetworkUnavailable
         }
         guard FileManager.default.fileExists(atPath: recordingURL.path) else {
@@ -215,7 +252,22 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         sentSegmentManifest = manifest
         remoteAcknowledgedLocalRecording = false
         try sendEncrypted(manifest, kind: "segment")
-        let transferURL = try PeerFileCryptor.seal(inputURL: recordingURL, key: sessionKey, authenticatedData: Data(sessionID.uuidString.utf8))
+        let authenticatedData = Data(sessionID.uuidString.utf8)
+        let transferURL = try await Task.detached(priority: .userInitiated) {
+            try PeerFileCryptor.seal(
+                inputURL: recordingURL,
+                key: sessionKey,
+                authenticatedData: authenticatedData
+            )
+        }.value
+        guard state == .paired,
+              self.session === session,
+              self.sessionID == sessionID,
+              expectedRemotePeerID == peer,
+              session.connectedPeers.contains(peer) else {
+            EvidenceCryptor.remove(transferURL)
+            throw PeerPairingError.invalidState
+        }
         let completionHandler: @Sendable (Error?) -> Void = { [weak self] error in
             try? FileManager.default.removeItem(at: transferURL)
             if let error {
@@ -248,6 +300,7 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         sessionKey = nil
         sessionID = nil
         joinedInvitation = nil
+        expectedRemotePeerID = nil
         invitationCode = nil
         remoteProfile = nil
         verificationCode = nil
@@ -284,10 +337,14 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
     }
 
     private func sendHello() throws {
-        guard let privateKey, let sessionID, let session else { throw PeerPairingError.invalidPeerMessage }
+        guard let privateKey, let sessionID, let session,
+              let peer = expectedRemotePeerID,
+              session.connectedPeers.contains(peer) else {
+            throw PeerPairingError.invalidPeerMessage
+        }
         let hello = PairHello(sessionID: sessionID, publicKey: privateKey.publicKey.rawRepresentation)
         let wire = PeerWireMessage(kind: "hello", payload: try JSONEncoder().encode(hello))
-        try session.send(JSONEncoder().encode(wire), toPeers: session.connectedPeers, with: .reliable)
+        try session.send(JSONEncoder().encode(wire), toPeers: [peer], with: .reliable)
     }
 
     private func sendProfile() throws {
@@ -296,20 +353,42 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
     }
 
     private func sendEncrypted<T: Encodable>(_ value: T, kind: String) throws {
-        guard let sessionKey, let session, let sessionID else { throw PeerPairingError.keyAgreementFailed }
+        guard let sessionKey, let session, let sessionID,
+              let peer = expectedRemotePeerID,
+              session.connectedPeers.contains(peer) else {
+            throw PeerPairingError.keyAgreementFailed
+        }
         let plaintext = try JSONEncoder().encode(value)
+        guard plaintext.count <= PeerProtocolLimits.maximumPlaintextPayloadSize else {
+            throw PeerPairingError.invalidPeerMessage
+        }
         guard let encrypted = try AES.GCM.seal(plaintext, using: sessionKey, authenticating: Data(sessionID.uuidString.utf8)).combined else {
             throw PeerPairingError.keyAgreementFailed
         }
         let wire = PeerWireMessage(kind: "sealed:\(kind)", payload: encrypted)
-        try session.send(JSONEncoder().encode(wire), toPeers: session.connectedPeers, with: .reliable)
+        let encoded = try JSONEncoder().encode(wire)
+        guard encoded.count <= PeerProtocolLimits.maximumWireMessageSize else {
+            throw PeerPairingError.invalidPeerMessage
+        }
+        try session.send(encoded, toPeers: [peer], with: .reliable)
     }
 
-    private func receive(_ data: Data) {
+    private func receive(_ data: Data) async {
         do {
-            let wire = try JSONDecoder().decode(PeerWireMessage.self, from: data)
+            guard data.count <= PeerProtocolLimits.maximumWireMessageSize else {
+                throw PeerPairingError.invalidPeerMessage
+            }
+            let wire = try SafeJSONDecoder.decode(PeerWireMessage.self, from: data)
+            guard wire.kind.count <= 64,
+                  wire.payload.count <= PeerProtocolLimits.maximumWirePayloadSize else {
+                throw PeerPairingError.invalidPeerMessage
+            }
             if wire.kind == "hello" {
-                let hello = try JSONDecoder().decode(PairHello.self, from: wire.payload)
+                guard joinedInvitation == nil,
+                      state == .hosting || state == .connecting else {
+                    throw PeerPairingError.invalidPeerMessage
+                }
+                let hello = try SafeJSONDecoder.decode(PairHello.self, from: wire.payload)
                 try establishHostKey(from: hello)
                 try sendProfile()
                 state = .connecting
@@ -320,11 +399,14 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
             }
             let box = try AES.GCM.SealedBox(combined: wire.payload)
             let plaintext = try AES.GCM.open(box, using: sessionKey, authenticating: Data(sessionID.uuidString.utf8))
+            guard plaintext.count <= PeerProtocolLimits.maximumPlaintextPayloadSize else {
+                throw PeerPairingError.invalidPeerMessage
+            }
             switch String(wire.kind.dropFirst("sealed:".count)) {
             case "profile":
-                let profile = try JSONDecoder().decode(PairedProfile.self, from: plaintext)
-                guard !profile.name.isEmpty, profile.name.count <= 80,
-                      profile.avatarData?.count ?? 0 <= 1_048_576 else {
+                guard state == .connecting else { throw PeerPairingError.invalidPeerMessage }
+                let profile = try SafeJSONDecoder.decode(PairedProfile.self, from: plaintext)
+                guard PeerProtocolLimits.isValidProfile(profile) else {
                     throw PeerPairingError.invalidPeerMessage
                 }
                 remoteProfile = profile
@@ -332,12 +414,16 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
                 verificationCode = shortCode(using: sessionKey, sessionID: sessionID)
                 state = .awaitingConfirmation
             case "confirm":
-                let confirmation = try JSONDecoder().decode(PairConfirmation.self, from: plaintext)
+                guard state == .awaitingConfirmation || state == .paired else {
+                    throw PeerPairingError.invalidPeerMessage
+                }
+                let confirmation = try SafeJSONDecoder.decode(PairConfirmation.self, from: plaintext)
                 guard confirmation.sessionID == sessionID else { throw PeerPairingError.invalidPeerMessage }
                 remoteConfirmed = true
                 updateConfirmedState()
             case "segment":
-                let manifest = try JSONDecoder().decode(SegmentManifest.self, from: plaintext)
+                guard state == .paired else { throw PeerPairingError.invalidPeerMessage }
+                let manifest = try SafeJSONDecoder.decode(SegmentManifest.self, from: plaintext)
                 guard let localRole = self.localRole,
                       manifest.role != localRole,
                       manifest.duration > 0,
@@ -347,9 +433,10 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
                     throw PeerPairingError.invalidPeerMessage
                 }
                 remoteSegmentManifest = manifest
-                try validateReceivedRecordingIfReady()
+                try await validateReceivedRecordingIfReady()
             case "recording-receipt":
-                let receipt = try JSONDecoder().decode(RecordingReceipt.self, from: plaintext)
+                guard state == .paired else { throw PeerPairingError.invalidPeerMessage }
+                let receipt = try SafeJSONDecoder.decode(RecordingReceipt.self, from: plaintext)
                 guard let localRole,
                       receipt.matches(
                         sessionID: sessionID,
@@ -367,10 +454,17 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
         }
     }
 
-    private func validateReceivedRecordingIfReady() throws {
+    private func validateReceivedRecordingIfReady() async throws {
         guard let receivedRecordingURL,
               let manifest = remoteSegmentManifest else { return }
-        let actual = try FileHasher.sha256Hex(of: receivedRecordingURL)
+        let actual = try await Task.detached(priority: .userInitiated) {
+            try FileHasher.sha256Hex(of: receivedRecordingURL)
+        }.value
+        guard self.receivedRecordingURL == receivedRecordingURL,
+              remoteSegmentManifest == manifest,
+              state == .paired else {
+            return
+        }
         guard actual.caseInsensitiveCompare(manifest.sha256) == .orderedSame else {
             EvidenceCryptor.remove(receivedRecordingURL)
             self.receivedRecordingURL = nil
@@ -410,12 +504,20 @@ final class PeerSessionCoordinator: NSObject, ObservableObject {
     private func makePeerID() -> MCPeerID {
         MCPeerID(displayName: "xg-\(UUID().uuidString.prefix(12))")
     }
+
+    private func isExpected(_ peerID: MCPeerID, session: MCSession) -> Bool {
+        self.session === session && expectedRemotePeerID == peerID
+    }
 }
 
 extension PeerSessionCoordinator: MCSessionDelegate {
     nonisolated func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            guard self.isExpected(peerID, session: session) else {
+                session.cancelConnectPeer(peerID)
+                return
+            }
             switch state {
             case .connected:
                 self.state = .connecting
@@ -431,7 +533,10 @@ extension PeerSessionCoordinator: MCSessionDelegate {
     }
 
     nonisolated func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        Task { @MainActor [weak self] in self?.receive(data) }
+        Task { @MainActor [weak self] in
+            guard let self, self.isExpected(peerID, session: session) else { return }
+            await self.receive(data)
+        }
     }
 
     nonisolated func session(_ session: MCSession, didReceive stream: InputStream, withName streamName: String, fromPeer peerID: MCPeerID) {}
@@ -440,7 +545,8 @@ extension PeerSessionCoordinator: MCSessionDelegate {
     nonisolated func session(_ session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, at localURL: URL?, withError error: (any Error)?) {
         guard resourceName == "xagree-recording", error == nil, let localURL else {
             Task { @MainActor [weak self] in
-                self?.state = .failed(L10n.string("未能接收对方的视频。"))
+                guard let self, self.isExpected(peerID, session: session) else { return }
+                self.state = .failed(L10n.string("未能接收对方的视频。"))
             }
             return
         }
@@ -453,7 +559,11 @@ extension PeerSessionCoordinator: MCSessionDelegate {
                     EvidenceCryptor.remove(stagedURL)
                     return
                 }
-                self.finishReceivingRecording(at: stagedURL)
+                guard self.isExpected(peerID, session: session) else {
+                    EvidenceCryptor.remove(stagedURL)
+                    return
+                }
+                await self.finishReceivingRecording(at: stagedURL)
             }
         } catch {
             Task { @MainActor [weak self] in
@@ -464,21 +574,28 @@ extension PeerSessionCoordinator: MCSessionDelegate {
 }
 
 private extension PeerSessionCoordinator {
-    func finishReceivingRecording(at stagedURL: URL) {
+    func finishReceivingRecording(at stagedURL: URL) async {
         defer { EvidenceCryptor.remove(stagedURL) }
         guard let key = sessionKey, let sessionID else {
             state = .failed(L10n.string("未能接收对方的视频。"))
             return
         }
         do {
-            let decrypted = try PeerFileCryptor.open(
-                inputURL: stagedURL,
-                key: key,
-                authenticatedData: Data(sessionID.uuidString.utf8)
-            )
+            let authenticatedData = Data(sessionID.uuidString.utf8)
+            let decrypted = try await Task.detached(priority: .userInitiated) {
+                try PeerFileCryptor.open(
+                    inputURL: stagedURL,
+                    key: key,
+                    authenticatedData: authenticatedData
+                )
+            }.value
+            guard self.sessionID == sessionID, state == .paired else {
+                EvidenceCryptor.remove(decrypted)
+                return
+            }
             EvidenceCryptor.remove(receivedRecordingURL)
             receivedRecordingURL = decrypted
-            try validateReceivedRecordingIfReady()
+            try await validateReceivedRecordingIfReady()
         } catch {
             state = .failed(L10n.string("收到的视频无法通过加密校验。"))
         }
@@ -496,10 +613,13 @@ extension PeerSessionCoordinator: MCNearbyServiceAdvertiserDelegate {
             guard let self,
                   let context,
                   let expectedID = self.sessionID,
-                  String(data: context, encoding: .utf8) == expectedID.uuidString else {
+                  String(data: context, encoding: .utf8) == expectedID.uuidString,
+                  self.expectedRemotePeerID == nil || self.expectedRemotePeerID == peerID else {
                 invitationHandler(false, nil)
                 return
             }
+            self.expectedRemotePeerID = peerID
+            self.state = .connecting
             invitationHandler(true, self.session)
         }
     }
@@ -512,7 +632,9 @@ extension PeerSessionCoordinator: MCNearbyServiceBrowserDelegate {
                   let invitation = self.joinedInvitation,
                   peerID.displayName == invitation.hostPeerID,
                   info?["session"] == invitation.sessionID.uuidString,
+                  self.expectedRemotePeerID == nil,
                   let session = self.session else { return }
+            self.expectedRemotePeerID = peerID
             browser.invitePeer(peerID, to: session, withContext: Data(invitation.sessionID.uuidString.utf8), timeout: 20)
             self.state = .connecting
         }
@@ -521,7 +643,7 @@ extension PeerSessionCoordinator: MCNearbyServiceBrowserDelegate {
     nonisolated func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {}
 }
 
-private extension FixedWidthInteger {
+private nonisolated extension FixedWidthInteger {
     var bigEndianData: Data {
         var value = bigEndian
         return Data(bytes: &value, count: MemoryLayout<Self>.size)
@@ -529,7 +651,14 @@ private extension FixedWidthInteger {
 }
 
 enum PeerResourceStager {
-    nonisolated static func stage(_ sourceURL: URL) throws -> URL {
+    nonisolated static func stage(
+        _ sourceURL: URL,
+        maximumSize: Int64 = 514 * 1_024 * 1_024
+    ) throws -> URL {
+        let sourceSize = try sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+        guard sourceSize > 0, Int64(sourceSize) <= maximumSize else {
+            throw PeerPairingError.invalidPeerMessage
+        }
         let destinationURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension("peer-incoming")
@@ -551,10 +680,10 @@ enum PeerResourceStager {
     }
 }
 
-enum PeerFileCryptor {
+nonisolated enum PeerFileCryptor {
     private static let chunkSize = 1_048_576
     private static let maximumPlaintextSize: UInt64 = 512 * 1_024 * 1_024
-    private static let maximumEncryptedSize: Int64 = 514 * 1_024 * 1_024
+    static let maximumEncryptedSize: Int64 = 514 * 1_024 * 1_024
 
     static func seal(inputURL: URL, key: SymmetricKey, authenticatedData: Data) throws -> URL {
         let sourceSize = try inputURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0

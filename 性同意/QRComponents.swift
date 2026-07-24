@@ -1,6 +1,7 @@
 @preconcurrency import AVFoundation
 import Combine
 import CoreImage.CIFilterBuiltins
+import ImageIO
 import PhotosUI
 import SwiftUI
 import Vision
@@ -174,7 +175,10 @@ private struct UniversalQRScannerSheet: View {
             guard let data = try await imageItem.loadTransferable(type: Data.self) else {
                 throw QRCodeScanError.invalidImage
             }
-            deliver(try QRCodeImageDecoder.decode(data: data))
+            let code = try await Task.detached(priority: .userInitiated) {
+                try QRCodeImageDecoder.decode(data: data)
+            }.value
+            deliver(code)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -190,7 +194,7 @@ private struct UniversalQRScannerSheet: View {
     }
 }
 
-private enum QRCodeScanError: LocalizedError {
+private nonisolated enum QRCodeScanError: LocalizedError {
     case invalidImage
     case noCode
 
@@ -202,9 +206,23 @@ private enum QRCodeScanError: LocalizedError {
     }
 }
 
-enum QRCodeImageDecoder {
+nonisolated enum QRCodeImageDecoder {
+    static let maximumInputSize = 20 * 1_024 * 1_024
+
     static func decode(data: Data) throws -> String {
-        guard let image = CIImage(data: data),
+        guard !data.isEmpty,
+              data.count <= maximumInputSize,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetCount(source) == 1,
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? NSNumber,
+              let height = properties[kCGImagePropertyPixelHeight] as? NSNumber,
+              width.intValue > 0,
+              height.intValue > 0,
+              width.intValue <= 8_192,
+              height.intValue <= 8_192,
+              width.intValue * height.intValue <= 40_000_000,
+              let image = CIImage(data: data),
               let detector = CIDetector(
                 ofType: CIDetectorTypeQRCode,
                 context: CIContext(options: [.useSoftwareRenderer: true]),

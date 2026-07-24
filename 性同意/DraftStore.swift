@@ -54,7 +54,7 @@ enum DraftStore {
                 )
                 for file in files where file.lastPathComponent.hasSuffix(".draft.json") {
                     do {
-                        let draft = try JSONDecoder().decode(
+                        let draft = try SafeJSONDecoder.decode(
                             ExportDraft.self,
                             from: Data(contentsOf: file)
                         )
@@ -166,40 +166,43 @@ enum DraftStore {
         segmentURL: URL,
         manifest: SegmentManifest,
         vaultPassword: String
-    ) throws {
+    ) async throws {
         try AppFiles.prepareDirectories()
         purgeExpiredStaging()
-        let fileName = "\(sessionID.uuidString)-\(role.rawValue).xagree"
-        let package = try EvidenceCryptor.seal(
-            videoURL: segmentURL,
-            manifest: EvidenceManifest(
-                version: 1,
-                sessionID: sessionID,
-                createdAt: Date(),
-                mode: .dual,
-                participantNames: [role.rawValue: "staging"],
-                segments: [manifest],
-                finalVideoSHA256: manifest.sha256,
-                appVersion: "1.0",
-                profileSnapshots: nil
-            ),
-            password: vaultPassword
-        )
-        let destination = AppFiles.stagingURL.appendingPathComponent(fileName)
         let metadataURL = AppFiles.stagingURL.appendingPathComponent("\(sessionID.uuidString).json")
+        let previousRecord = (try? Data(contentsOf: metadataURL))
+            .flatMap { try? SafeJSONDecoder.decode(StagingRecord.self, from: $0) }
+        let fileName = "\(sessionID.uuidString)-\(role.rawValue)-\(UUID().uuidString).xagree"
+        let stagingManifest = EvidenceManifest(
+            version: 1,
+            sessionID: sessionID,
+            createdAt: Date(),
+            mode: .dual,
+            participantNames: [role.rawValue: "staging"],
+            segments: [manifest],
+            finalVideoSHA256: manifest.sha256,
+            appVersion: "1.0",
+            profileSnapshots: nil
+        )
+        let package = try await Task.detached(priority: .userInitiated) {
+            try EvidenceCryptor.seal(
+                videoURL: segmentURL,
+                manifest: stagingManifest,
+                password: vaultPassword
+            )
+        }.value
+        if Task.isCancelled {
+            EvidenceCryptor.remove(package)
+            throw CancellationError()
+        }
+        let destination = AppFiles.stagingURL.appendingPathComponent(fileName)
         var committed = false
-        var replacementStarted = false
         defer {
             if !committed {
                 EvidenceCryptor.remove(package)
-                if replacementStarted {
-                    try? FileManager.default.removeItem(at: destination)
-                    try? FileManager.default.removeItem(at: metadataURL)
-                }
+                try? FileManager.default.removeItem(at: destination)
             }
         }
-        try AppFiles.removeItemIfExists(destination)
-        replacementStarted = true
         try FileManager.default.moveItem(at: package, to: destination)
         try AppFiles.protect(url: destination)
         let record = StagingRecord(
@@ -209,21 +212,36 @@ enum DraftStore {
             manifest: manifest,
             fileName: fileName
         )
-        try JSONEncoder().encode(record).write(to: metadataURL, options: .atomic)
-        try AppFiles.protect(url: metadataURL)
+        try JSONEncoder().encode(record).write(
+            to: metadataURL,
+            options: [.atomic, .completeFileProtection]
+        )
         committed = true
+        if let previousRecord, previousRecord.fileName != fileName {
+            try? AppFiles.removeItemIfExists(
+                AppFiles.stagingURL.appendingPathComponent(
+                    URL(fileURLWithPath: previousRecord.fileName).lastPathComponent
+                )
+            )
+        }
     }
 
     static func loadStaging(
         sessionID: UUID,
         vaultPassword: String
-    ) throws -> (url: URL, manifest: SegmentManifest)? {
+    ) async throws -> (url: URL, manifest: SegmentManifest)? {
         purgeExpiredStaging()
         let metaURL = AppFiles.stagingURL.appendingPathComponent("\(sessionID.uuidString).json")
         guard FileManager.default.fileExists(atPath: metaURL.path) else { return nil }
-        let record = try JSONDecoder().decode(StagingRecord.self, from: Data(contentsOf: metaURL))
+        let record = try SafeJSONDecoder.decode(
+            StagingRecord.self,
+            from: Data(contentsOf: metaURL)
+        )
+        let safeFileName = URL(fileURLWithPath: record.fileName).lastPathComponent
         guard record.sessionID == sessionID,
-              record.fileName == "\(sessionID.uuidString)-\(record.role.rawValue).xagree" else {
+              safeFileName == record.fileName,
+              safeFileName.hasPrefix("\(sessionID.uuidString)-\(record.role.rawValue)-"),
+              URL(fileURLWithPath: safeFileName).pathExtension == "xagree" else {
             try clearStaging(sessionID: sessionID)
             return nil
         }
@@ -232,7 +250,13 @@ enum DraftStore {
             throw SessionFailure.stagingExpired
         }
         let packageURL = AppFiles.stagingURL.appendingPathComponent(record.fileName)
-        let decrypted = try EvidenceCryptor.open(packageURL: packageURL, password: vaultPassword)
+        let decrypted = try await Task.detached(priority: .userInitiated) {
+            try EvidenceCryptor.open(packageURL: packageURL, password: vaultPassword)
+        }.value
+        if Task.isCancelled {
+            EvidenceCryptor.remove(decrypted.videoURL)
+            throw CancellationError()
+        }
         guard decrypted.manifest.sessionID == sessionID,
               decrypted.manifest.mode == .dual,
               decrypted.manifest.segments == [record.manifest],
@@ -250,7 +274,7 @@ enum DraftStore {
             "\(sessionID.uuidString)-\(ParticipantRole.b.rawValue).xagree"
         ]
         if let data = try? Data(contentsOf: metaURL),
-           let record = try? JSONDecoder().decode(StagingRecord.self, from: data) {
+           let record = try? SafeJSONDecoder.decode(StagingRecord.self, from: data) {
             let fileName = URL(fileURLWithPath: record.fileName).lastPathComponent
             if fileName == record.fileName {
                 packageNames.append(fileName)
@@ -269,7 +293,10 @@ enum DraftStore {
             includingPropertiesForKeys: nil
         )) ?? []
         for file in files where file.pathExtension == "json" {
-            if let record = try? JSONDecoder().decode(StagingRecord.self, from: Data(contentsOf: file)),
+            if let record = try? SafeJSONDecoder.decode(
+                StagingRecord.self,
+                from: Data(contentsOf: file)
+            ),
                record.expiresAt > Date() {
                 return record.sessionID
             }
@@ -282,14 +309,27 @@ enum DraftStore {
             at: AppFiles.stagingURL,
             includingPropertiesForKeys: nil
         )) ?? []
+        var retainedPackageNames = Set<String>()
         for file in files where file.pathExtension == "json" {
-            guard let record = try? JSONDecoder().decode(StagingRecord.self, from: Data(contentsOf: file)) else {
+            guard let record = try? SafeJSONDecoder.decode(
+                StagingRecord.self,
+                from: Data(contentsOf: file)
+            ) else {
                 try? FileManager.default.removeItem(at: file)
                 continue
             }
             if record.expiresAt <= Date() {
                 try? clearStaging(sessionID: record.sessionID)
+            } else {
+                let fileName = URL(fileURLWithPath: record.fileName).lastPathComponent
+                if fileName == record.fileName {
+                    retainedPackageNames.insert(fileName)
+                }
             }
+        }
+        for file in files where file.pathExtension == "xagree"
+            && !retainedPackageNames.contains(file.lastPathComponent) {
+            try? FileManager.default.removeItem(at: file)
         }
     }
 
@@ -303,7 +343,7 @@ enum DraftStore {
     private static func readIndex() throws -> [ExportDraft] {
         guard FileManager.default.fileExists(atPath: AppFiles.draftsIndexURL.path) else { return [] }
         do {
-            return try JSONDecoder().decode(
+            return try SafeJSONDecoder.decode(
                 [ExportDraft].self,
                 from: Data(contentsOf: AppFiles.draftsIndexURL)
             )

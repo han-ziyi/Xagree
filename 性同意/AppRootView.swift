@@ -3,14 +3,16 @@ import SwiftUI
 import UIKit
 
 enum AppTheme {
-    static let canvas = Color(red: 0.965, green: 0.955, blue: 0.96)
-    static let paper = Color(red: 0.995, green: 0.995, blue: 0.99)
-    static let ink = Color(red: 0.16, green: 0.14, blue: 0.15)
-    static let mutedInk = Color(red: 0.40, green: 0.36, blue: 0.37)
-    static let accent = Color(red: 0.79, green: 0.28, blue: 0.33)
-    static let accentSoft = Color(red: 0.98, green: 0.88, blue: 0.86)
-    static let sage = Color(red: 0.26, green: 0.46, blue: 0.39)
-    static let line = Color(red: 0.87, green: 0.82, blue: 0.80)
+    static let canvasUIColor = UIColor.systemGroupedBackground
+    static let inkUIColor = UIColor.label
+    static let canvas = Color(uiColor: canvasUIColor)
+    static let paper = Color(uiColor: .secondarySystemGroupedBackground)
+    static let ink = Color(uiColor: inkUIColor)
+    static let mutedInk = Color(uiColor: .secondaryLabel)
+    static let accent = Color(uiColor: .systemRed)
+    static let accentSoft = Color(uiColor: .tertiarySystemFill)
+    static let sage = Color(uiColor: .systemGreen)
+    static let line = Color(uiColor: .separator)
 }
 
 struct AppScreenBackground: ViewModifier {
@@ -269,8 +271,7 @@ struct VaultSetupView: View {
                         .textContentType(.newPassword)
                         .accessibilityIdentifier(AccessibilityID.vaultConfirm)
                     PasswordValidationFeedback(password: password, confirmation: confirmation)
-                    TextField("辅助记忆提示词（可选，最多 60 字）", text: $hint, axis: .vertical)
-                        .lineLimit(1...3)
+                    TextField("辅助记忆提示词（可选，最多 60 字）", text: $hint)
                         .accessibilityIdentifier(AccessibilityID.vaultHint)
                     Text("提示词不是密码，只是帮助你想起密码的线索；忘记密码后无法恢复记录。")
                         .font(.footnote)

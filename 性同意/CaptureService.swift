@@ -40,6 +40,17 @@ struct CaptureRequest: Sendable {
     }
 }
 
+enum RecordingInterruptionPolicy {
+    static func shouldAbort(
+        scenePhase: ScenePhase,
+        hasStarted: Bool,
+        isCountingDown: Bool,
+        isRecording: Bool
+    ) -> Bool {
+        scenePhase != .active && (hasStarted || isCountingDown || isRecording)
+    }
+}
+
 /// 使用 Video/Audio DataOutput + AVAssetWriter，在 writer 队列上实时烧录水印。
 @MainActor
 final class CaptureService: NSObject, ObservableObject {
@@ -307,6 +318,17 @@ final class CaptureService: NSObject, ObservableObject {
         )
 
         writerQueue.async {
+            if finishContext.cancel {
+                finishContext.writer?.cancelWriting()
+                CaptureWriterRuntime.unbind(id: finishContext.runtimeID)
+                Task { @MainActor in
+                    if let url = finishContext.url {
+                        try? FileManager.default.removeItem(at: url)
+                    }
+                    finishContext.continuation?.resume(throwing: CaptureError.noRecording)
+                }
+                return
+            }
             finishContext.video?.markAsFinished()
             finishContext.audio?.markAsFinished()
             finishContext.writer?.finishWriting {
@@ -315,11 +337,6 @@ final class CaptureService: NSObject, ObservableObject {
                 CaptureWriterRuntime.unbind(id: finishContext.runtimeID)
                 Task { @MainActor in
                     guard let continuation = finishContext.continuation else { return }
-                    if finishContext.cancel {
-                        if let url = finishContext.url { try? FileManager.default.removeItem(at: url) }
-                        continuation.resume(throwing: CaptureError.noRecording)
-                        return
-                    }
                     guard status == .completed,
                           let url = finishContext.url,
                           let watermark = finishContext.watermark else {
