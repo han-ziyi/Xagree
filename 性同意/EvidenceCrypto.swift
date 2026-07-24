@@ -79,7 +79,7 @@ nonisolated enum EvidenceCryptor {
             throw EvidenceCryptoError.invalidPackage
         }
 
-        let outputURL = try AppFiles.temporaryURL(extension: "xagree")
+        let outputURL = try AppFiles.exportPackageURL(at: manifest.createdAt)
         var shouldRemoveOutput = true
         defer {
             if shouldRemoveOutput { try? FileManager.default.removeItem(at: outputURL) }

@@ -327,7 +327,13 @@ final class DualSessionModel: ObservableObject {
         stage = .processing(L10n.string("正在加密本机副本…"))
         do {
             try transition(to: .encrypting)
-            let finalHash = try FileHasher.sha256Hex(of: finalVideoURL)
+            let avatarData = profile.avatarData
+            let hashes = try await Task.detached(priority: .userInitiated) {
+                (
+                    video: try FileHasher.sha256Hex(of: finalVideoURL),
+                    avatar: avatarData.map { FileHasher.sha256Hex(of: $0) }
+                )
+            }.value
             guard let own = localSegment?.manifest,
                   let remote = retainedRemoteManifest ?? coordinator.remoteSegmentManifest else {
                 throw SessionFailure.missingRecording
@@ -338,7 +344,7 @@ final class DualSessionModel: ObservableObject {
                 : ["A": remoteName, "B": localName]
             let localSnap = ParticipantProfileSnapshot(
                 name: localName,
-                avatarSHA256: profile.avatarData.map { FileHasher.sha256Hex(of: $0) }
+                avatarSHA256: hashes.avatar
             )
             let remoteSnap = ParticipantProfileSnapshot(
                 name: remoteName,
@@ -354,7 +360,7 @@ final class DualSessionModel: ObservableObject {
                 mode: .dual,
                 participantNames: names,
                 segments: orderedSegments,
-                finalVideoSHA256: finalHash,
+                finalVideoSHA256: hashes.video,
                 appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                 profileSnapshots: snapshots
             )

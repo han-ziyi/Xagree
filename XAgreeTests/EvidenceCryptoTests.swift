@@ -7,6 +7,20 @@ import UIKit
 
 @MainActor
 final class EvidenceCryptoTests: XCTestCase {
+    func testExportPackageFileNameUsesLocalDateAndTime() throws {
+        let date = try XCTUnwrap(
+            ISO8601DateFormatter().date(from: "2026-07-24T15:30:45Z")
+        )
+
+        XCTAssertEqual(
+            AppFiles.exportPackageFileName(
+                at: date,
+                timeZone: try XCTUnwrap(TimeZone(secondsFromGMT: 0))
+            ),
+            "XAgree-20260724-153045.xagree"
+        )
+    }
+
     func testSafeJSONRejectsInvalidUTF8BeforeFoundationDecode() {
         XCTAssertThrowsError(
             try SafeJSONDecoder.decode([String: String].self, from: Data([0xFF]))

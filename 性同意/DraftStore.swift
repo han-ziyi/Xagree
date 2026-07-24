@@ -105,8 +105,9 @@ enum DraftStore {
     static func saveExportDraft(from packageURL: URL, mode: BackupMode) throws -> ExportDraft {
         try AppFiles.prepareDirectories()
         let id = UUID()
-        let fileName = "pending-\(id.uuidString).xagree"
-        let destination = AppFiles.draftsURL.appendingPathComponent(fileName)
+        let createdAt = Date()
+        let destination = try AppFiles.exportPackageURL(in: AppFiles.draftsURL, at: createdAt)
+        let fileName = destination.lastPathComponent
         var committed = false
         defer {
             if !committed {
@@ -118,7 +119,7 @@ enum DraftStore {
         let draft = ExportDraft(
             id: id,
             fileName: fileName,
-            createdAt: Date(),
+            createdAt: createdAt,
             mode: mode,
             relativePath: fileName
         )
@@ -355,15 +356,16 @@ enum DraftStore {
     private static func saveRecoveryDraft(from packageURL: URL, mode: BackupMode) throws -> ExportDraft {
         try AppFiles.prepareDirectories()
         let id = UUID()
-        let fileName = "recovered-\(id.uuidString).xagree"
+        let createdAt = Date()
+        let destination = try AppFiles.exportPackageURL(in: AppFiles.draftsURL, at: createdAt)
+        let fileName = destination.lastPathComponent
         let draft = ExportDraft(
             id: id,
             fileName: fileName,
-            createdAt: Date(),
+            createdAt: createdAt,
             mode: mode,
             relativePath: fileName
         )
-        let destination = draftURL(for: draft)
         let metadataURL = recoveryMetadataURL(for: draft)
         var committed = false
         defer {

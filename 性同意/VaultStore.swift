@@ -241,6 +241,48 @@ nonisolated enum AppFiles {
         return workURL.appendingPathComponent(UUID().uuidString).appendingPathExtension(fileExtension)
     }
 
+    static func exportPackageFileName(
+        at date: Date = Date(),
+        timeZone: TimeZone = .current
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second],
+            from: date
+        )
+        return String(
+            format: "XAgree-%04d%02d%02d-%02d%02d%02d.xagree",
+            components.year ?? 0,
+            components.month ?? 0,
+            components.day ?? 0,
+            components.hour ?? 0,
+            components.minute ?? 0,
+            components.second ?? 0
+        )
+    }
+
+    static func exportPackageURL(
+        in directory: URL? = nil,
+        at date: Date = Date()
+    ) throws -> URL {
+        try prepareDirectories()
+        let destinationDirectory = directory ?? workURL
+        let manager = FileManager.default
+        let defaultName = exportPackageFileName(at: date)
+        let stem = URL(fileURLWithPath: defaultName).deletingPathExtension().lastPathComponent
+        let fileExtension = URL(fileURLWithPath: defaultName).pathExtension
+        var candidate = destinationDirectory.appendingPathComponent(defaultName)
+        var suffix = 2
+        while manager.fileExists(atPath: candidate.path) {
+            candidate = destinationDirectory
+                .appendingPathComponent("\(stem)-\(suffix)")
+                .appendingPathExtension(fileExtension)
+            suffix += 1
+        }
+        return candidate
+    }
+
     /// Work 只保存可重建的明文临时文件。每次冷启动都应清空，避免崩溃或强退后残留。
     static func purgeTemporaryWorkFiles() throws {
         try clearDirectory(workURL)

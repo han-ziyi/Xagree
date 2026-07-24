@@ -142,8 +142,13 @@ final class SingleSessionModel: ObservableObject {
         processingLabel = L10n.string("正在加密视频…")
         do {
             try transition(to: .encrypting)
-            let finalHash = try FileHasher.sha256Hex(of: finalVideoURL)
-            let avatarHash = owner.avatarData.map { FileHasher.sha256Hex(of: $0) }
+            let avatarData = owner.avatarData
+            let hashes = try await Task.detached(priority: .userInitiated) {
+                (
+                    video: try FileHasher.sha256Hex(of: finalVideoURL),
+                    avatar: avatarData.map { FileHasher.sha256Hex(of: $0) }
+                )
+            }.value
             let manifest = EvidenceManifest(
                 version: 1,
                 sessionID: sessionID,
@@ -151,10 +156,10 @@ final class SingleSessionModel: ObservableObject {
                 mode: .single,
                 participantNames: ["A": participantA, "B": participantB],
                 segments: completedSegmentManifests,
-                finalVideoSHA256: finalHash,
+                finalVideoSHA256: hashes.video,
                 appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
                 profileSnapshots: [
-                    "A": ParticipantProfileSnapshot(name: participantA, avatarSHA256: avatarHash),
+                    "A": ParticipantProfileSnapshot(name: participantA, avatarSHA256: hashes.avatar),
                     "B": ParticipantProfileSnapshot(name: participantB, avatarSHA256: nil)
                 ]
             )

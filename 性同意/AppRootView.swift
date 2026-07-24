@@ -90,6 +90,7 @@ struct AppRootView: View {
 
             if appState.isPrivacyShieldVisible {
                 PrivacyShieldView()
+                    .allowsHitTesting(false)
                     .transition(.opacity)
                     .zIndex(999)
             }

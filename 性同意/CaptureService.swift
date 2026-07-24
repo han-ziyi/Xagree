@@ -271,8 +271,14 @@ final class CaptureService: NSObject, ObservableObject {
             Task { @MainActor in
                 guard let self, let startedAt = self.startedAt else { return }
                 let elapsed = Date().timeIntervalSince(startedAt)
-                self.elapsedSeconds = min(Int(maxDuration), Int(elapsed))
-                self.remainingSeconds = max(0, Int(ceil(maxDuration - elapsed)))
+                let nextElapsedSeconds = min(Int(maxDuration), Int(elapsed))
+                let nextRemainingSeconds = max(0, Int(ceil(maxDuration - elapsed)))
+                if self.elapsedSeconds != nextElapsedSeconds {
+                    self.elapsedSeconds = nextElapsedSeconds
+                }
+                if self.remainingSeconds != nextRemainingSeconds {
+                    self.remainingSeconds = nextRemainingSeconds
+                }
                 if elapsed >= maxDuration {
                     self.stop()
                 }
@@ -335,7 +341,7 @@ final class CaptureService: NSObject, ObservableObject {
                 let status = finishContext.writer?.status
                 let writerError = finishContext.writer?.error
                 CaptureWriterRuntime.unbind(id: finishContext.runtimeID)
-                Task { @MainActor in
+                Task {
                     guard let continuation = finishContext.continuation else { return }
                     guard status == .completed,
                           let url = finishContext.url,
@@ -347,16 +353,22 @@ final class CaptureService: NSObject, ObservableObject {
                     do {
                         try AppFiles.protect(url: url)
                         let duration = await MediaProcessor.duration(of: url)
-                        let hash = try FileHasher.sha256Hex(of: url)
-                        continuation.resume(returning: CaptureArtifact(
-                            url: url,
-                            duration: duration,
-                            sha256: hash,
-                            watermark: watermark
-                        ))
+                        let hash = try await Task.detached(priority: .userInitiated) {
+                            try FileHasher.sha256Hex(of: url)
+                        }.value
+                        await MainActor.run {
+                            continuation.resume(returning: CaptureArtifact(
+                                url: url,
+                                duration: duration,
+                                sha256: hash,
+                                watermark: watermark
+                            ))
+                        }
                     } catch {
                         try? FileManager.default.removeItem(at: url)
-                        continuation.resume(throwing: error)
+                        await MainActor.run {
+                            continuation.resume(throwing: error)
+                        }
                     }
                 }
             }
