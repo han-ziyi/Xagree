@@ -880,7 +880,7 @@ private struct DualProtectEvidenceView: View {
 private struct DualExportEvidenceView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var model: DualSessionModel
-    @State private var isExporting = true
+    @State private var isExporting = false
     @State private var defaultFilename = AppFiles.exportPackageBaseName()
 
     var body: some View {
@@ -890,25 +890,34 @@ private struct DualExportEvidenceView: View {
             Text("请在系统文件保存器中选择本机 iCloud Drive 文件夹。取消后将保留待导出草稿。")
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("重新打开保存器") { isExporting = true }.buttonStyle(.bordered)
+            Button("重新打开保存器") { reopenExporter() }.buttonStyle(.bordered)
         }
-        .fileExporter(
+        .evidenceDocumentExporter(
             isPresented: $isExporting,
-            item: model.encryptedPackageURL.map(EvidenceExportItem.init),
-            contentTypes: [.xagreeEvidence],
-            defaultFilename: defaultFilename
-        ) { result in
-            switch result {
-            case .success:
+            packageURL: model.encryptedPackageURL,
+            preferredBaseName: preferredExportBaseName(for: model.encryptedPackageURL),
+            onCompleted: {
                 model.finishExport()
-            case .failure(let error):
+                appState.refreshDrafts()
+            },
+            onCancelled: {
                 model.cancelExport(saveDraft: true)
-                model.error = AppError(title: "无法保存", detail: error.localizedDescription)
+                appState.refreshDrafts()
             }
-            appState.refreshDrafts()
-        } onCancellation: {
-            model.cancelExport(saveDraft: true)
-            appState.refreshDrafts()
+        )
+        .onAppear { reopenExporter() }
+    }
+
+    private func preferredExportBaseName(for url: URL?) -> String {
+        guard let url else { return defaultFilename }
+        let stem = url.deletingPathExtension().lastPathComponent
+        return stem.isEmpty ? defaultFilename : stem
+    }
+
+    private func reopenExporter() {
+        isExporting = false
+        DispatchQueue.main.async {
+            isExporting = true
         }
     }
 }

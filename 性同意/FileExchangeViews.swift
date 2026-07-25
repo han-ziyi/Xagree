@@ -1,5 +1,4 @@
 import AVKit
-import CoreTransferable
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -10,13 +9,215 @@ extension UTType {
     )
 }
 
-nonisolated struct EvidenceExportItem: Transferable, Sendable {
+/// 系统文件导出面板。
+///
+/// 重要：不要把 `UIDocumentPickerViewController` 直接当作 SwiftUI `.sheet` 的根控制器——
+/// 在较新的 iOS 上该写法经常导致保存页不出现、或“静默结束”。
+/// 正确做法是用透明宿主 VC，再 `present` 文档选择器。
+///
+/// 自定义默认文件名：导出前把包复制为 `preferredBaseName.xagree`，
+/// 系统保存面板会沿用该文件名（用户仍可在 Files UI 中改名）。
+struct FileExportSheet: UIViewControllerRepresentable {
     let url: URL
+    /// 不含扩展名的默认文件名；为空则使用源文件名。
+    var preferredBaseName: String?
+    let onCompleted: () -> Void
+    let onCancelled: () -> Void
 
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .xagreeEvidence) { item in
-            SentTransferredFile(item.url)
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCompleted: onCompleted, onCancelled: onCancelled)
+    }
+
+    func makeUIViewController(context: Context) -> HostController {
+        HostController()
+    }
+
+    func updateUIViewController(_ host: HostController, context: Context) {
+        context.coordinator.parent = self
+        host.onReadyToPresent = { [weak host] in
+            guard let host, host.presentedViewController == nil else { return }
+            context.coordinator.presentPicker(from: host)
         }
+        // 视图进入窗口后尝试弹出
+        DispatchQueue.main.async {
+            host.tryPresent()
+        }
+    }
+
+    /// 将源包复制到临时目录，使用可读的时间戳文件名供系统保存面板展示。
+    nonisolated static func preparedExportURL(from source: URL, preferredBaseName: String?) throws -> URL {
+        let manager = FileManager.default
+        let directory = manager.temporaryDirectory.appendingPathComponent("XAgreeExport", isDirectory: true)
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let base: String = {
+            if let preferredBaseName, !preferredBaseName.isEmpty {
+                return preferredBaseName
+            }
+            let stem = source.deletingPathExtension().lastPathComponent
+            return stem.isEmpty ? AppFiles.exportPackageBaseName() : stem
+        }()
+        let destination = directory.appendingPathComponent(base).appendingPathExtension("xagree")
+        if manager.fileExists(atPath: destination.path) {
+            try manager.removeItem(at: destination)
+        }
+        try manager.copyItem(at: source, to: destination)
+        return destination
+    }
+
+    final class HostController: UIViewController {
+        var onReadyToPresent: (() -> Void)?
+
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            view.backgroundColor = .clear
+            view.isUserInteractionEnabled = false
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            tryPresent()
+        }
+
+        func tryPresent() {
+            guard viewIfLoaded?.window != nil else { return }
+            onReadyToPresent?()
+        }
+    }
+
+    final class Coordinator: NSObject, UIDocumentPickerDelegate {
+        var parent: FileExportSheet?
+        let onCompleted: () -> Void
+        let onCancelled: () -> Void
+        private var didPresent = false
+        private var temporaryExportURL: URL?
+
+        init(onCompleted: @escaping () -> Void, onCancelled: @escaping () -> Void) {
+            self.onCompleted = onCompleted
+            self.onCancelled = onCancelled
+        }
+
+        func presentPicker(from host: UIViewController) {
+            guard !didPresent, let parent else { return }
+            didPresent = true
+
+            let exportURL: URL
+            do {
+                exportURL = try FileExportSheet.preparedExportURL(
+                    from: parent.url,
+                    preferredBaseName: parent.preferredBaseName
+                )
+                temporaryExportURL = exportURL == parent.url ? nil : exportURL
+            } catch {
+                // 复制失败时退回源文件，至少保证保存面板可用
+                exportURL = parent.url
+                temporaryExportURL = nil
+            }
+
+            let picker = UIDocumentPickerViewController(forExporting: [exportURL], asCopy: true)
+            picker.delegate = self
+            picker.shouldShowFileExtensions = true
+            picker.modalPresentationStyle = .formSheet
+
+            // 0 尺寸 background 宿主可能不适合直接 present；优先用当前 key window 顶层 VC。
+            let presenter = Self.topViewController(from: host) ?? host
+            if presenter.presentedViewController == nil {
+                presenter.present(picker, animated: true)
+            } else {
+                // 已有模态时挂到最上层，避免被挡
+                var top = presenter
+                while let next = top.presentedViewController {
+                    top = next
+                }
+                top.present(picker, animated: true)
+            }
+        }
+
+        private static func topViewController(from start: UIViewController) -> UIViewController? {
+            if let window = start.view.window {
+                var top = window.rootViewController
+                while let presented = top?.presentedViewController {
+                    top = presented
+                }
+                return top
+            }
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            let window = scenes.flatMap(\.windows).first(where: \.isKeyWindow)
+                ?? scenes.flatMap(\.windows).first
+            var top = window?.rootViewController
+            while let presented = top?.presentedViewController {
+                top = presented
+            }
+            return top
+        }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            cleanupTemporary()
+            onCompleted()
+        }
+
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            cleanupTemporary()
+            onCancelled()
+        }
+
+        private func cleanupTemporary() {
+            if let temporaryExportURL {
+                try? FileManager.default.removeItem(at: temporaryExportURL)
+            }
+            temporaryExportURL = nil
+        }
+    }
+}
+
+/// 控制导出面板的开关：确保每次打开都走 false→true，避免 SwiftUI 不重建 present。
+struct EvidenceExportTrigger: ViewModifier {
+    @Binding var isPresented: Bool
+    let packageURL: URL?
+    var preferredBaseName: String?
+    let onCompleted: () -> Void
+    let onCancelled: () -> Void
+
+    func body(content: Content) -> some View {
+        content.background {
+            if isPresented, let packageURL {
+                FileExportSheet(
+                    url: packageURL,
+                    preferredBaseName: preferredBaseName ?? packageURL.deletingPathExtension().lastPathComponent,
+                    onCompleted: {
+                        isPresented = false
+                        onCompleted()
+                    },
+                    onCancelled: {
+                        isPresented = false
+                        onCancelled()
+                    }
+                )
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+        }
+    }
+}
+
+extension View {
+    func evidenceDocumentExporter(
+        isPresented: Binding<Bool>,
+        packageURL: URL?,
+        preferredBaseName: String? = nil,
+        onCompleted: @escaping () -> Void,
+        onCancelled: @escaping () -> Void
+    ) -> some View {
+        modifier(
+            EvidenceExportTrigger(
+                isPresented: isPresented,
+                packageURL: packageURL,
+                preferredBaseName: preferredBaseName,
+                onCompleted: onCompleted,
+                onCancelled: onCancelled
+            )
+        )
     }
 }
 
@@ -60,7 +261,7 @@ struct EvidenceImportView: View {
         }
         .fileImporter(
             isPresented: $showingImporter,
-            allowedContentTypes: [UTType(filenameExtension: "xagree") ?? .data]
+            allowedContentTypes: [UTType(filenameExtension: "xagree") ?? .data, .xagreeEvidence]
         ) { result in
             switch result {
             case .success(let url): selectedURL = url

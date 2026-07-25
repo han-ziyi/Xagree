@@ -694,7 +694,10 @@ struct PendingDraftsView: View {
                     HStack {
                         Button("重新导出") {
                             exportDraft = draft
-                            isExporting = true
+                            isExporting = false
+                            DispatchQueue.main.async {
+                                isExporting = true
+                            }
                         }
                         .buttonStyle(.bordered)
                     Button("删除", role: .destructive) {
@@ -722,35 +725,27 @@ struct PendingDraftsView: View {
         .appReadableWidth(760)
         .navigationTitle("待导出草稿")
         .appScreenBackground()
-        .fileExporter(
+        .evidenceDocumentExporter(
             isPresented: $isExporting,
-            item: exportDraft.map {
-                EvidenceExportItem(url: DraftStore.draftURL(for: $0))
-            },
-            contentTypes: [.xagreeEvidence],
-            defaultFilename: exportDraft.map {
-                AppFiles.exportPackageBaseName(at: $0.createdAt)
-            }
-        ) { result in
-            if case .success = result, let exportDraft {
-                do {
-                    try appState.deleteDraft(exportDraft)
-                } catch {
-                    appState.transientError = AppError(
-                        title: "无法删除草稿",
-                        detail: error.localizedDescription
-                    )
+            packageURL: exportDraft.map { DraftStore.draftURL(for: $0) },
+            preferredBaseName: exportDraft.map { AppFiles.exportPackageBaseName(at: $0.createdAt) },
+            onCompleted: {
+                if let exportDraft {
+                    do {
+                        try appState.deleteDraft(exportDraft)
+                    } catch {
+                        appState.transientError = AppError(
+                            title: "无法删除草稿",
+                            detail: error.localizedDescription
+                        )
+                    }
+                    self.exportDraft = nil
                 }
-                self.exportDraft = nil
-            } else if case .failure(let error) = result {
-                appState.transientError = AppError(
-                    title: "无法保存",
-                    detail: error.localizedDescription
-                )
+            },
+            onCancelled: {
+                // isPresented 已由 exporter 置 false
             }
-        } onCancellation: {
-            isExporting = false
-        }
+        )
         .onAppear { appState.refreshDrafts() }
     }
 }

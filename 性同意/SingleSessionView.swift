@@ -728,7 +728,7 @@ private struct ProtectEvidenceView: View {
 private struct ExportEvidenceView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var model: SingleSessionModel
-    @State private var isExporting = true
+    @State private var isExporting = false
     @State private var defaultFilename = AppFiles.exportPackageBaseName()
 
     var body: some View {
@@ -742,28 +742,38 @@ private struct ExportEvidenceView: View {
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal)
-            Button("重新打开保存器") { isExporting = true }
+            Button("重新打开保存器") { reopenExporter() }
                 .buttonStyle(.bordered)
         }
-        .fileExporter(
+        .evidenceDocumentExporter(
             isPresented: $isExporting,
-            item: model.encryptedPackageURL.map(EvidenceExportItem.init),
-            contentTypes: [.xagreeEvidence],
-            defaultFilename: defaultFilename
-        ) { result in
-            switch result {
-            case .success:
+            packageURL: model.encryptedPackageURL,
+            preferredBaseName: preferredExportBaseName(for: model.encryptedPackageURL),
+            onCompleted: {
                 model.finishExport()
-            case .failure(let error):
+                appState.refreshDrafts()
+            },
+            onCancelled: {
                 model.cancelExport(saveDraft: true)
-                model.error = AppError(title: "无法保存", detail: error.localizedDescription)
+                appState.refreshDrafts()
             }
-            appState.refreshDrafts()
-        } onCancellation: {
-            model.cancelExport(saveDraft: true)
-            appState.refreshDrafts()
-        }
+        )
+        .onAppear { reopenExporter() }
         .navigationBarBackButtonHidden()
+    }
+
+    private func preferredExportBaseName(for url: URL?) -> String {
+        guard let url else { return defaultFilename }
+        let stem = url.deletingPathExtension().lastPathComponent
+        return stem.isEmpty ? defaultFilename : stem
+    }
+
+    private func reopenExporter() {
+        // 强制 false→true，保证宿主 VC 重新挂载并 present 文档选择器
+        isExporting = false
+        DispatchQueue.main.async {
+            isExporting = true
+        }
     }
 }
 
