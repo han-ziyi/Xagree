@@ -90,6 +90,7 @@ struct FileExportSheet: UIViewControllerRepresentable {
         let onCompleted: () -> Void
         let onCancelled: () -> Void
         private var didPresent = false
+        private var didFinish = false
         private var temporaryExportURL: URL?
 
         init(onCompleted: @escaping () -> Void, onCancelled: @escaping () -> Void) {
@@ -152,11 +153,15 @@ struct FileExportSheet: UIViewControllerRepresentable {
         }
 
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard !didFinish else { return }
+            didFinish = true
             cleanupTemporary()
             onCompleted()
         }
 
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            guard !didFinish else { return }
+            didFinish = true
             cleanupTemporary()
             onCancelled()
         }

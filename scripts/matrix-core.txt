@@ -1,0 +1,19 @@
+# Core matrix: one destination per line.
+# Format: label|name_or_udid   OR   name_or_udid
+#
+# non-notch / home button
+SE3_iOS17|XAgree iPhone SE 3 iOS 17.0
+SE3_iOS18|XAgree iPhone SE 3 iOS 18.6
+SE3_iOS26|400A2EB8-BE8A-402C-B995-7C7CF7FD7C0D
+# notch
+mini_iOS17|XAgree iPhone 13 mini iOS 17.0
+mini_iOS18|XAgree iPhone 13 mini iOS 18.6
+mini_iOS26|XAgree iPhone 13 mini iOS 26.5
+# dynamic island
+pro_iOS17|iPhone 15 Pro
+iphone16_iOS18|iPhone 16
+iphone16_iOS26|XAgree iPhone 16
+# iPad
+ipad10_iOS17|XAgree iPad 10 iOS 17.0
+ipad10_iOS18|XAgree iPad 10 iOS 18.6
+ipad_A16_iOS26|B911AF33-ED94-405B-BFA9-E4FE2F569E77

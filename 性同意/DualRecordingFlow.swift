@@ -50,6 +50,8 @@ final class DualSessionModel: ObservableObject {
     @Published var error: AppError?
     @Published var encryptedPackageURL: URL?
     @Published var sessionPhase: SessionPhase = .draft
+    /// 导出页「稍后保存」时请求退出双机会话。
+    @Published var requestDismiss = false
     private var localSegment: LocalSegment?
     /// 合成后仍保留，避免 coordinator 断开后丢失对方清单
     private var retainedRemoteManifest: SegmentManifest?
@@ -631,7 +633,11 @@ struct DualRecordingFlow: View {
             case .protect:
                 DualProtectEvidenceView(model: model)
             case .export:
-                DualExportEvidenceView(model: model)
+                DualExportEvidenceView(model: model) {
+                    model.cancelExport(saveDraft: true)
+                    appState.refreshDrafts()
+                    model.requestDismiss = true
+                }
             case .complete:
                 DualCompletionView()
             }
@@ -892,6 +898,7 @@ private struct DualProtectEvidenceView: View {
 private struct DualExportEvidenceView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var model: DualSessionModel
+    var onSaveLater: () -> Void
     @State private var isExporting = false
     @State private var defaultFilename = AppFiles.exportPackageBaseName()
 
@@ -903,6 +910,12 @@ private struct DualExportEvidenceView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Button("重新打开保存器") { reopenExporter() }.buttonStyle(.bordered)
+            Button("稍后保存（保留草稿）") {
+                isExporting = false
+                onSaveLater()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("export.saveLater")
         }
         .evidenceDocumentExporter(
             isPresented: $isExporting,

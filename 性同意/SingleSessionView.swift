@@ -28,6 +28,8 @@ final class SingleSessionModel: ObservableObject {
     @Published var encryptedPackageURL: URL?
     @Published var error: AppError?
     @Published var sessionPhase: SessionPhase = .draft
+    /// 导出页「稍后保存」等需要整页退出单机会话时置 true。
+    @Published var requestDismiss = false
     private var segments: [ParticipantRole: Segment] = [:]
     private var completedSegmentManifests: [SegmentManifest] = []
     private var hasCancelled = false
@@ -316,11 +318,14 @@ final class SingleSessionModel: ObservableObject {
 
 struct SingleSessionView: View {
     let profile: ParticipantProfile
+    /// 由首页 `navigationDestination(item:)` 传入，用于清掉 item binding 以可靠返回。
+    var onRequestClose: (() -> Void)?
     @EnvironmentObject private var appState: AppState
     @StateObject private var model: SingleSessionModel
 
-    init(profile: ParticipantProfile) {
+    init(profile: ParticipantProfile, onRequestClose: (() -> Void)? = nil) {
         self.profile = profile
+        self.onRequestClose = onRequestClose
         _model = StateObject(wrappedValue: SingleSessionModel(owner: profile))
     }
 
@@ -338,7 +343,11 @@ struct SingleSessionView: View {
             case .protect:
                 ProtectEvidenceView(model: model)
             case .export:
-                ExportEvidenceView(model: model)
+                ExportEvidenceView(model: model) {
+                    model.cancelExport(saveDraft: true)
+                    appState.refreshDrafts()
+                    onRequestClose?()
+                }
             case .complete:
                 CompletionView()
             }
@@ -728,6 +737,7 @@ private struct ProtectEvidenceView: View {
 private struct ExportEvidenceView: View {
     @EnvironmentObject private var appState: AppState
     @ObservedObject var model: SingleSessionModel
+    var onSaveLater: () -> Void
     @State private var isExporting = false
     @State private var defaultFilename = AppFiles.exportPackageBaseName()
 
@@ -744,6 +754,12 @@ private struct ExportEvidenceView: View {
                 .padding(.horizontal)
             Button("重新打开保存器") { reopenExporter() }
                 .buttonStyle(.bordered)
+            Button("稍后保存（保留草稿）") {
+                isExporting = false
+                onSaveLater()
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("export.saveLater")
         }
         .evidenceDocumentExporter(
             isPresented: $isExporting,
@@ -759,7 +775,7 @@ private struct ExportEvidenceView: View {
             }
         )
         .onAppear { reopenExporter() }
-        .navigationBarBackButtonHidden()
+        .navigationBarBackButtonHidden(false)
     }
 
     private func preferredExportBaseName(for url: URL?) -> String {

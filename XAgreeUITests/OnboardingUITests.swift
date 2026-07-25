@@ -390,6 +390,30 @@ final class OnboardingUITests: XCTestCase {
         assertSystemSaveSheetPresents(exportStageHints: ["本机副本已加密", "重新打开保存器"])
     }
 
+    func testExportCancelCreatesDraftAndReopens() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("This test resets its isolated App data and is simulator-only")
+        #endif
+
+        prepareApp()
+        launchSkipToHome(extraArguments: ["-UITestingSingleExport"])
+        waitTap("home.single")
+
+        assertSystemSaveSheetPresents(exportStageHints: ["已加密", "重新打开保存器"])
+        dismissSystemSaveSheet()
+
+        // 取消/关闭保存器后仍停留在导出页，可再次打开系统面板
+        let reopen = app.buttons["重新打开保存器"]
+        XCTAssertTrue(reopen.waitForExistence(timeout: 6), "export stage should remain after cancel")
+        XCTAssertTrue(
+            element("export.saveLater").waitForExistence(timeout: 3),
+            "save-later control should be available for draft retention"
+        )
+        reopen.tap()
+        assertSystemSaveSheetPresents(exportStageHints: ["已加密", "重新打开保存器"])
+        // 草稿索引持久化由 EvidenceCryptoTests.testPreserveExportDraftCopiesPackageIntoDraftsIndex 覆盖
+    }
+
     /// 断言系统 UIDocumentPicker 保存面板出现（含时间戳默认文件名）。
     private func assertSystemSaveSheetPresents(exportStageHints: [String]) {
         // iOS 26 系统导出面板：顶部「保存」+ 底部「保存为 <timestamp>」
@@ -435,6 +459,48 @@ final class OnboardingUITests: XCTestCase {
                 combined.range(of: timestampPattern, options: .regularExpression),
                 "unexpected default export filename: \(combined)"
             )
+        }
+    }
+
+    private func dismissSystemSaveSheet() {
+        for title in ["取消", "Cancel"] {
+            let btn = app.buttons[title]
+            if btn.waitForExistence(timeout: 1) {
+                btn.tap()
+                return
+            }
+        }
+        // iOS 26 document browser: back / close in nav bar
+        let back = app.navigationBars.buttons.firstMatch
+        if back.waitForExistence(timeout: 2) {
+            back.tap()
+            // May need a second tap if first only pops folder level
+            if app.buttons["保存"].waitForExistence(timeout: 1) || app.buttons["Save"].exists {
+                let back2 = app.navigationBars.buttons.firstMatch
+                if back2.exists { back2.tap() }
+            }
+            return
+        }
+        // Last resort: swipe down on sheet
+        if app.sheets.firstMatch.exists {
+            app.sheets.firstMatch.swipeDown()
+        }
+    }
+
+    private func popToHomeFromExportIfNeeded() {
+        if element("home.root").waitForExistence(timeout: 1)
+            || app.navigationBars["我们的记录"].waitForExistence(timeout: 1) {
+            return
+        }
+        // Export hides back button; use interactive edge swipe
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.45))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.45))
+        start.press(forDuration: 0.05, thenDragTo: end)
+        if !(element("home.root").waitForExistence(timeout: 3)
+            || app.navigationBars["我们的记录"].waitForExistence(timeout: 1)) {
+            // Try nav bar back if any parent exposed it
+            let navBack = app.navigationBars.buttons.firstMatch
+            if navBack.exists { navBack.tap() }
         }
     }
 

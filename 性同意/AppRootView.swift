@@ -626,11 +626,12 @@ struct HomeView: View {
                         NavigationLink {
                             PendingDraftsView()
                         } label: {
-                            Label("删除待导出草稿", systemImage: "trash")
+                            Label("待导出草稿", systemImage: "doc.badge.clock")
                             Spacer()
                             Text("\(appState.exportDrafts.count)")
                                 .foregroundStyle(.secondary)
                         }
+                        .accessibilityIdentifier(AccessibilityID.homeDrafts)
                     }
                 }
 
@@ -657,9 +658,24 @@ struct HomeView: View {
             .navigationDestination(item: $destination) { destination in
                 switch destination {
                 case .single:
-                    SingleSessionView(profile: appState.profile ?? ParticipantProfile(name: "", avatarData: nil))
+                    SingleSessionView(
+                        profile: appState.profile ?? ParticipantProfile(name: "", avatarData: nil),
+                        onRequestClose: {
+                            // 异步清 binding，避免在子视图更新周期里直接改 NavigationStack path
+                            DispatchQueue.main.async {
+                                self.destination = nil
+                            }
+                        }
+                    )
                 case .dual:
-                    DualSessionView(profile: appState.profile ?? ParticipantProfile(name: "", avatarData: nil))
+                    DualSessionView(
+                        profile: appState.profile ?? ParticipantProfile(name: "", avatarData: nil),
+                        onRequestClose: {
+                            DispatchQueue.main.async {
+                                self.destination = nil
+                            }
+                        }
+                    )
                 }
             }
             .onAppear { appState.refreshDrafts() }
@@ -700,6 +716,7 @@ struct PendingDraftsView: View {
                             }
                         }
                         .buttonStyle(.bordered)
+                        .accessibilityIdentifier(AccessibilityID.draftReexport)
                     Button("删除", role: .destructive) {
                             do {
                                 try appState.deleteDraft(draft)

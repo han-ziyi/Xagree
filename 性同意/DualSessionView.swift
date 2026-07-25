@@ -20,6 +20,7 @@ enum DualSessionPresentationPolicy {
 
 struct DualSessionView: View {
     let profile: ParticipantProfile
+    var onRequestClose: (() -> Void)?
     @EnvironmentObject private var appState: AppState
     @StateObject private var coordinator: PeerSessionCoordinator
     @StateObject private var workflow: DualSessionModel
@@ -28,8 +29,9 @@ struct DualSessionView: View {
     @State private var copiedInvitationCode: String?
     @State private var error: AppError?
 
-    init(profile: ParticipantProfile) {
+    init(profile: ParticipantProfile, onRequestClose: (() -> Void)? = nil) {
         self.profile = profile
+        self.onRequestClose = onRequestClose
         let coordinator = PeerSessionCoordinator(profile: profile)
         _coordinator = StateObject(wrappedValue: coordinator)
         _workflow = StateObject(wrappedValue: DualSessionModel(profile: profile, coordinator: coordinator))
@@ -82,6 +84,11 @@ struct DualSessionView: View {
         }
         .alert(item: $error) { error in
             Alert(title: Text(error.title), message: Text(error.detail), dismissButton: .default(Text("知道了")))
+        }
+        .onChange(of: workflow.requestDismiss) { _, shouldDismiss in
+            guard shouldDismiss else { return }
+            appState.refreshDrafts()
+            onRequestClose?()
         }
     }
 

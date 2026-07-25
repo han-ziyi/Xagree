@@ -21,6 +21,24 @@ final class EvidenceCryptoTests: XCTestCase {
         )
     }
 
+    func testPreserveExportDraftCopiesPackageIntoDraftsIndex() throws {
+        try AppFiles.prepareDirectories()
+        try AppFiles.clearDirectory(AppFiles.draftsURL)
+        try DraftStore.deleteAllDrafts()
+
+        let source = try AppFiles.exportPackageURL()
+        try Data("draft-fixture".utf8).write(to: source, options: .atomic)
+
+        let preserved = try DraftStore.preserveExportDraft(from: source, mode: .single)
+        let draftURL = DraftStore.draftURL(for: preserved.draft)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: draftURL.path))
+        XCTAssertTrue(DraftStore.listDrafts().contains(where: { $0.id == preserved.draft.id }))
+        XCTAssertEqual(preserved.draft.mode, .single)
+
+        try DraftStore.deleteDraft(preserved.draft)
+        try? FileManager.default.removeItem(at: source)
+    }
+
     func testSafeJSONRejectsInvalidUTF8BeforeFoundationDecode() {
         XCTAssertThrowsError(
             try SafeJSONDecoder.decode([String: String].self, from: Data([0xFF]))
