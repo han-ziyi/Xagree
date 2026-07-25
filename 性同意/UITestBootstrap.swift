@@ -8,6 +8,7 @@ enum UITestBootstrap {
     static let singleProtectFlag = "-UITestingSingleProtect"
     static let singleExportFlag = "-UITestingSingleExport"
     static let singleCompletionFlag = "-UITestingSingleCompletion"
+    static let dualExportFlag = "-UITestingDualExport"
 
     static func permitsTesting(arguments: [String], debugBuild: Bool) -> Bool {
         debugBuild && arguments.contains(testingFlag)
@@ -38,6 +39,10 @@ enum UITestBootstrap {
 
     static var shouldShowSingleCompletion: Bool {
         isUITesting && ProcessInfo.processInfo.arguments.contains(singleCompletionFlag)
+    }
+
+    static var shouldShowDualExport: Bool {
+        isUITesting && ProcessInfo.processInfo.arguments.contains(dualExportFlag)
     }
 
     /// 在 App 初始化最早阶段调用：清状态或预置可进入首页的私密空间。

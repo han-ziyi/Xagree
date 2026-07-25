@@ -375,11 +375,24 @@ final class OnboardingUITests: XCTestCase {
 
         prepareApp()
         launchSkipToHome(extraArguments: ["-UITestingSingleExport"])
-
         waitTap("home.single")
+        assertSystemSaveSheetPresents(exportStageHints: ["已加密", "重新打开保存器"])
+    }
 
+    func testDualNativeExporterPresentsSaveSheet() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("This test resets its isolated App data and is simulator-only")
+        #endif
+
+        prepareApp()
+        launchSkipToHome(extraArguments: ["-UITestingDualExport"])
+        waitTap("home.dual")
+        assertSystemSaveSheetPresents(exportStageHints: ["本机副本已加密", "重新打开保存器"])
+    }
+
+    /// 断言系统 UIDocumentPicker 保存面板出现（含时间戳默认文件名）。
+    private func assertSystemSaveSheetPresents(exportStageHints: [String]) {
         // iOS 26 系统导出面板：顶部「保存」+ 底部「保存为 <timestamp>」
-        // 旧版可能是 Cancel/取消；系统 UI 不一定挂在 app 进程树下，故多路径探测。
         let saveCandidates = [
             app.buttons["保存"],
             app.buttons["Save"],
@@ -396,7 +409,6 @@ final class OnboardingUITests: XCTestCase {
             }
         }
 
-        // 再扫一遍含时间戳的元素（文件名条「保存为 2026-…」）
         let timestampPattern = #"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}"#
         let namePredicate = NSPredicate(
             format: "label MATCHES %@ OR value MATCHES %@",
@@ -406,13 +418,11 @@ final class OnboardingUITests: XCTestCase {
         let namedElement = app.descendants(matching: .any).matching(namePredicate).firstMatch
         let sawTimestampName = namedElement.waitForExistence(timeout: 3)
 
-        // 系统文档 UI 偶发不进入 app 的 accessibility 树：至少应进入导出页
         if !pickerVisible && !sawTimestampName {
-            XCTAssertTrue(
-                app.staticTexts["已加密"].waitForExistence(timeout: 2)
-                    || app.buttons["重新打开保存器"].exists,
-                "should at least reach the export stage when system picker is not queryable"
-            )
+            let onExportStage = exportStageHints.contains { hint in
+                app.staticTexts[hint].exists || app.buttons[hint].exists
+            }
+            XCTAssertTrue(onExportStage, "should at least reach export stage when system picker is not queryable")
         } else {
             XCTAssertTrue(pickerVisible || sawTimestampName, "system save sheet should appear")
         }

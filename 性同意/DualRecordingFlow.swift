@@ -65,6 +65,18 @@ final class DualSessionModel: ObservableObject {
         if DraftStore.activeStagingSessionID() != nil {
             stage = .recoverStaging
             sessionPhase = .transferring
+        } else if UITestBootstrap.shouldShowDualExport {
+            // UI 测试：跳过配对/录制，直接验证双机导出保存面板
+            do {
+                try AppFiles.prepareDirectories()
+                let url = try AppFiles.exportPackageURL()
+                try Data("XAgree dual UI test export".utf8).write(to: url, options: .atomic)
+                encryptedPackageURL = url
+                stage = .export
+                sessionPhase = .awaitingExport
+            } catch {
+                assertionFailure("UITest dual export bootstrap failed: \(error)")
+            }
         }
 
         coordinator.$receivedRecordingURL
