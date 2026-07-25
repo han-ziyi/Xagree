@@ -703,6 +703,7 @@
       }
     },
     "删除待导出草稿" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2897,6 +2898,22 @@
         }
       }
     },
+    "未找到加密包" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encrypted package not found"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暗号化パッケージが見つかりません"
+          }
+        }
+      }
+    },
     "未找到完成的录制文件。" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3445,6 +3462,22 @@
         }
       }
     },
+    "没有可保留或删除的待导出文件。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "There is no pending export file to keep or delete."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持または削除できる書き出し待ちのファイルがありません。"
+          }
+        }
+      }
+    },
     "清除本机私密空间？" : {
       "localizations" : {
         "en" : {
@@ -3836,6 +3869,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "プライベートスペースのパスワードを入力しました"
+          }
+        }
+      }
+    },
+    "稍后保存（保留草稿）" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save later (keep draft)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "後で保存（下書きを保持）"
           }
         }
       }

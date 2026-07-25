@@ -434,9 +434,17 @@ final class DualSessionModel: ObservableObject {
         stage = .complete
     }
 
-    func cancelExport(saveDraft: Bool) {
-        guard let url = encryptedPackageURL else { return }
+    @discardableResult
+    func cancelExport(saveDraft: Bool) -> Bool {
+        guard let url = encryptedPackageURL else {
+            error = AppError(title: "未找到加密包", detail: "没有可保留或删除的待导出文件。")
+            return false
+        }
         if saveDraft {
+            if let existingDraft = DraftStore.draft(matching: url) {
+                encryptedPackageURL = DraftStore.draftURL(for: existingDraft)
+                return true
+            }
             do {
                 let result = try DraftStore.preserveExportDraft(from: url, mode: .dual)
                 let draft = result.draft
@@ -447,14 +455,15 @@ final class DualSessionModel: ObservableObject {
                 if let warning = result.warning {
                     error = AppError(title: "草稿已单独保留", detail: warning.localizedDescription)
                 }
-                return
+                return true
             } catch {
                 self.error = AppError(title: "无法保留草稿", detail: error.localizedDescription)
-                return
+                return false
             }
         }
         EvidenceCryptor.remove(url)
         encryptedPackageURL = nil
+        return true
     }
 
     @discardableResult
@@ -634,7 +643,7 @@ struct DualRecordingFlow: View {
                 DualProtectEvidenceView(model: model)
             case .export:
                 DualExportEvidenceView(model: model) {
-                    model.cancelExport(saveDraft: true)
+                    guard model.cancelExport(saveDraft: true) else { return }
                     appState.refreshDrafts()
                     model.requestDismiss = true
                 }

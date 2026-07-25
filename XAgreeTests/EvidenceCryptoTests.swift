@@ -39,6 +39,31 @@ final class EvidenceCryptoTests: XCTestCase {
         try? FileManager.default.removeItem(at: source)
     }
 
+    func testCancellingExportTwiceReusesTheExistingDraft() throws {
+        try AppFiles.prepareDirectories()
+        try DraftStore.deleteAllDrafts()
+        defer { try? DraftStore.deleteAllDrafts() }
+
+        let source = try AppFiles.exportPackageURL()
+        try Data("idempotent-draft-fixture".utf8).write(to: source, options: .atomic)
+        defer { try? FileManager.default.removeItem(at: source) }
+
+        let model = SingleSessionModel(
+            owner: ParticipantProfile(name: "Test participant", avatarData: nil)
+        )
+        model.encryptedPackageURL = source
+
+        XCTAssertTrue(model.cancelExport(saveDraft: true))
+        let firstDraftURL = try XCTUnwrap(model.encryptedPackageURL)
+        XCTAssertEqual(DraftStore.listDrafts().count, 1)
+        XCTAssertNotNil(DraftStore.draft(matching: firstDraftURL))
+
+        XCTAssertTrue(model.cancelExport(saveDraft: true))
+        XCTAssertEqual(model.encryptedPackageURL, firstDraftURL)
+        XCTAssertEqual(DraftStore.listDrafts().count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: firstDraftURL.path))
+    }
+
     func testSafeJSONRejectsInvalidUTF8BeforeFoundationDecode() {
         XCTAssertThrowsError(
             try SafeJSONDecoder.decode([String: String].self, from: Data([0xFF]))

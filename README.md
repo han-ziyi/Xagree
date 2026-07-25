@@ -7,198 +7,146 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/iOS-17.0%2B-111111?logo=apple" alt="iOS 17.0+">
-  <img src="https://img.shields.io/badge/Swift-6.0-F05138?logo=swift&logoColor=white" alt="Swift 6">
-  <img src="https://img.shields.io/badge/UI-SwiftUI-146CF6?logo=swift&logoColor=white" alt="SwiftUI">
-  <img src="https://img.shields.io/badge/Privacy-Local--first-4E8D6C" alt="Local-first privacy">
+  <img src="https://img.shields.io/badge/iOS-17.0%2B-111111?logo=apple" alt="支持 iOS 17.0 及以上版本">
+  <img src="https://img.shields.io/badge/设备-iPhone%20%26%20iPad-D24C5A" alt="支持 iPhone 与 iPad">
+  <img src="https://img.shields.io/badge/隐私-本地优先-4E8D6C" alt="本地优先">
+  <img src="https://img.shields.io/badge/账号-无需注册-6B7280" alt="无需注册">
 </p>
 
 <p align="center">
-  <strong>同意爱（XAgree）</strong>是一款面向成年伴侣的本地优先知情表达记录工具。<br>
-  无账号、无开发者服务器、无广告与追踪；双方亲自参与，记录由自己保存。
+  <strong>亲密不该靠猜，清晰表达是对彼此的尊重。</strong><br>
+  同意爱帮助成年伴侣当面表达、彼此确认，并把共同的记录留在自己手中。
 </p>
 
 <p align="center">
-  简体中文 · English · 日本語
+  <a href="https://ifdian.net/a/hanziyifir/plan">
+    <img src="https://img.shields.io/badge/爱发电-赞赏支持-946CE6?style=for-the-badge" alt="在爱发电赞赏支持同意爱">
+  </a>
 </p>
 
 > [!IMPORTANT]
-> 同意必须是清醒、自愿、明确、持续且随时可以撤回的。任何视频或文件都不能替代当下沟通，也不代表永久同意、身份认证或法律结论。本项目仅适用于已达到法定年龄、能够有效表达意愿且用途合法的参与者。
+> 同意应当是清醒、自愿、明确、持续且随时可以撤回的。任何记录都不能替代当下沟通，也不代表永久同意、身份认证或法律结论。如果任何一方感到犹豫、不适或压力，请立即停止。
 
-## 产品一览
+## 把边界说清楚，把安心留给彼此
+
+很多重要的话，不应该被催促，也不应该被含糊带过。
+
+同意爱提供一个克制、私密的表达空间：两个人亲自参与，分别确认自己的意愿，用一台或两台设备完成简短记录。没有社交关系链，没有开发者云端，也没有广告和追踪。
+
+它不是替你判断关系的工具，更不是一张“永久通行证”。它想做的事情很简单——让表达更认真，让沟通更明确，让记录的去向始终由你决定。
+
+## 现在的同意爱
 
 <table>
   <tr>
-    <td align="center" width="29%">
-      <img src="./docs/assets/home-zh.png" alt="同意爱中文首页" width="250"><br>
-      <sub>中文首页 · 两种记录方式</sub>
+    <td align="center" width="50%">
+      <img src="./docs/assets/home-zh.png" alt="同意爱中文首页：新建记录、同机模式、双机模式和私密记录入口" width="280"><br>
+      <strong>一个入口，两种相处方式</strong><br>
+      <sub>可以共用一台手机轮流完成，也可以使用两台附近设备各自记录、各自保存。</sub>
     </td>
-    <td align="center" width="29%">
-      <img src="./docs/assets/home-en.png" alt="XAgree English home screen" width="250"><br>
-      <sub>English · 完整本地化</sub>
-    </td>
-    <td align="center" width="42%">
-      <img src="./docs/assets/welcome-ipad.png" alt="同意爱 iPad 欢迎界面" width="350"><br>
-      <sub>iPad · 自适应大屏布局</sub>
+    <td align="center" width="50%">
+      <img src="./docs/assets/home-en.png" alt="XAgree 英文首页" width="280"><br>
+      <strong>三种语言，熟悉的表达</strong><br>
+      <sub>支持简体中文、English 和日本語，让每个人都能更自然地阅读与确认。</sub>
     </td>
   </tr>
 </table>
 
-## 为什么是同意爱
+<p align="center">
+  <img src="./docs/assets/welcome-ipad.png" alt="同意爱 iPad 欢迎页面：每个人亲自参与、内容留在手里、保存位置自己决定" width="760"><br>
+  <sub>在 iPad 上，同样保持安静、清楚、易读的体验。</sub>
+</p>
 
-同意爱把重点放在「一起把边界说清楚」，而不是给任何人制造证明压力。每位参与者都需要亲自确认资料、阅读固定声明并开始自己的录制；完成后的内容以加密文件保存到双方自己选择的位置。
+## 每一步，都由本人完成
 
-| 产品能力 | 体验 |
+### 01 · 先聊清楚，再开始
+
+两个人先当面沟通边界。进入记录后，每位参与者都要亲自核对资料、阅读声明并主动开始自己的录制。
+
+### 02 · 选择适合你们的方式
+
+- **同一台手机**：两个人依次完成，适合只有一台设备的场景。
+- **两台手机**：扫描二维码连接附近设备，双方各自录制、各自加密、各自选择保存位置。
+
+### 03 · 记录会明确告诉你正在发生什么
+
+开始前有 3 秒准备时间，录制中持续显示醒目的 `REC` 状态，单段最长 30 秒；不会静默启动、后台启动或由远端替你启动。
+
+### 04 · 保存权交还给你
+
+完成后生成加密的 `.xagree` 文件，通过系统“文件”界面保存。需要查看时，再导入文件并输入对应密码解锁。
+
+## 隐私不是口号，是默认设置
+
+| 你关心的事 | 同意爱的选择 |
 | --- | --- |
-| **两台手机，各自保存** | 扫描二维码建立附近设备加密连接；双方各自录制、各自加密、各自保存。 |
-| **一台手机，轮流完成** | 两位参与者依次录制，最终按照 A → B 合成为一份记录。 |
-| **私密空间** | 使用本地密码保护个人资料和待导出内容；密码不会发送给开发者。 |
-| **加密文件** | 导出版本化 `.xagree` 文件，必须通过本 App 和对应密码才能解锁播放。 |
-| **清晰的录制状态** | 3 秒准备倒计时、明显的 `REC` 状态、最长 30 秒、画面内烧录时间与会话信息。 |
-| **多语言与多设备** | 支持简体中文、英语、日语，以及 iPhone 与 iPad。 |
+| **需要注册吗？** | 不需要账号、手机号或邮箱。 |
+| **内容会上传吗？** | 不连接开发者服务器；双机模式只连接附近设备。 |
+| **会被追踪吗？** | 没有广告、行为分析或第三方统计 SDK。 |
+| **会出现在相册里吗？** | 原始片段与合成后的普通视频不写入系统相册。 |
+| **文件存在哪里？** | 由你通过系统文件选择器决定；选择 iCloud Drive 时由 Apple iCloud 保存。 |
+| **谁能打开？** | `.xagree` 文件需要使用本 App 和对应密码解锁。 |
 
-## 使用流程
+<p align="center">
+  <strong>不收集，不围观，不替你保管。</strong><br>
+  你们的表达，只属于参与其中的人。
+</p>
 
-```mermaid
-flowchart LR
-    A["双方当面沟通"] --> B["分别确认资料与固定声明"]
-    B --> C{"选择保存方式"}
-    C -->|"同一台手机"| D["依次录制 A / B"]
-    C -->|"两台手机"| E["二维码配对并各自录制"]
-    D --> F["合并并加密"]
-    E --> F
-    F --> G["各自选择保存位置"]
-    G --> H["导入 .xagree 并解锁查看"]
-```
+## 适合这样的你们
 
-1. **建立私密空间**
-   设置至少 8 位的本地密码，可选填写提示词；姓名与头像只保存在本机加密配置中。
+- 希望在亲密关系中更认真地讨论边界与意愿。
+- 希望每个人都能亲自表达，而不是由另一方代为确认。
+- 在意隐私，不愿把敏感内容交给陌生服务器。
+- 希望自己决定文件存放位置，并用密码保护它。
 
-2. **选择记录方式**
-   可以在同一台设备上轮流完成，也可以通过附近两台设备各自完成。
+## 仍在成长
 
-3. **每个人亲自参与**
-   双方分别核对资料与声明，并亲自点击开始；App 不提供静默、后台或远程启动录制。
+同意爱目前处于开源开发与真机验证阶段，尚未作为正式 App Store 版本发布。项目正在持续完善双机流程、隐私细节与多语言体验，也欢迎你通过 Issue 提交建议或参与改进。
 
-4. **合成、加密、导出**
-   两段记录按固定顺序合成后写入 `.xagree` 加密包，再通过系统“文件”界面保存到用户选择的位置。
+> 项目仍需要独立安全审查、适用地区的法律审查和完整的发布前验证。请不要把“本地优先”或“使用加密”理解为安全认证或法律保证。
 
-5. **需要时解锁查看**
-   从“文件”导入加密包并输入密码。临时播放文件会在退出播放、锁屏、切到后台或超时后清理。
+<details>
+<summary><strong>开发者：在本地运行</strong></summary>
 
-## 隐私设计
+<br>
 
-- **不要求账号**：没有注册、登录、手机号或邮箱流程。
-- **没有开发者云端**：App 不连接开发者服务器；双机模式仅使用附近设备连接。
-- **不做行为追踪**：无广告、分析、崩溃上报或第三方统计 SDK。
-- **保存位置由用户决定**：App 使用系统文件选择器导出；选择 iCloud Drive 时，文件交由 Apple iCloud 保存，而不是上传给开发者。
-- **不写入系统相册**：原始片段和合成明文不作为普通视频保存到照片库。
-- **后台立即遮蔽**：进入后台时显示隐私遮罩，并清理用于播放的临时明文。
-- **最小权限**：仅在对应流程需要时请求相机、麦克风和本地网络权限。
-
-项目内置的 Privacy Manifest 声明不收集数据、不追踪用户，也不配置追踪域名。
-
-## 安全实现
-
-| 环节 | 当前实现 |
-| --- | --- |
-| 文件内容加密 | 随机 256-bit 内容密钥；视频按 1 MiB 分块使用 AES-256-GCM 加密。 |
-| 密码派生 | PBKDF2-HMAC-SHA512、每文件随机盐和设备校准后的迭代次数。 |
-| 双机密钥协商 | 临时 X25519（Curve25519 Key Agreement）+ HKDF，并显示六位短验证码供双方核对。 |
-| 传输保护 | `MCSession` 强制加密，片段再次使用会话密钥分块加密。 |
-| 完整性检查 | AES-GCM 认证标签、唯一 nonce 检查与 SHA-256 文件哈希。 |
-| 本地文件保护 | 工作文件使用 `NSFileProtectionComplete`，并排除系统备份。 |
-
-安全设计与实现仍应接受独立审计。请不要把“使用了现代密码学算法”等同于“已经通过安全认证”。
-
-## 技术栈
-
-- **界面与状态**：SwiftUI、Observation
-- **音视频**：AVFoundation、AVAssetWriter、AVMutableComposition
-- **密码学**：CryptoKit、CommonCrypto、Security
-- **附近设备**：MultipeerConnectivity、Core Image 二维码
-- **文件与图片**：UniformTypeIdentifiers、PhotosUI、系统文件选择器
-- **工程配置**：Swift 6 语言模式，iOS 17.0+，iPhone / iPad
-- **第三方依赖**：无
-
-## 本地构建
-
-### 环境
-
-- macOS
-- Xcode 26.6（当前开发环境）
-- Swift 6.3.3（工程使用 Swift 6 语言模式）
-- iOS 17.0 或更高版本的模拟器 / 真机
-
-### 运行
+需要 macOS、Xcode，以及 iOS 17.0 或更高版本的 iPhone / iPad。
 
 ```bash
 git clone https://github.com/han-ziyi/Xagree.git
-cd agree
+cd Xagree
 open "性同意.xcodeproj"
 ```
 
-在 Xcode 中选择 `性同意` Scheme 和一个 iPhone / iPad 目标后运行。
+在 Xcode 中选择 `性同意` Scheme 和已连接的 iPhone / iPad 后运行。
 
-也可以从命令行构建：
+更完整的产品与安全设计见 [APP_PLAN.md](./APP_PLAN.md)，测试说明见 [docs/testing.md](./docs/testing.md)。
 
-```bash
-xcodebuild \
-  -project "性同意.xcodeproj" \
-  -scheme "性同意" \
-  -sdk iphonesimulator \
-  CODE_SIGNING_ALLOWED=NO \
-  build
-```
+</details>
 
-### 测试
+## 赞赏与支持
 
-仓库包含加密单元测试与关键引导流程 UI 测试：
+如果你认同“清晰表达、尊重边界、隐私留在自己手里”这件事，可以在爱发电支持项目继续开发。每一份赞赏都会用于真机测试、设计完善、隐私与安全审查，以及后续发布准备。
 
-```bash
-xcodebuild \
-  -project "性同意.xcodeproj" \
-  -scheme "性同意" \
-  -destination "platform=iOS Simulator,name=iPhone 16 Pro" \
-  test
-```
+<p align="center">
+  <a href="https://ifdian.net/a/hanziyifir/plan">
+    <img src="https://img.shields.io/badge/💜_前往爱发电-为同意爱发电-946CE6?style=for-the-badge" alt="前往爱发电为同意爱发电">
+  </a>
+</p>
 
-## 项目结构
-
-```text
-.
-├── 性同意/                     # App 源码与资源
-│   ├── AppRootView.swift       # 引导、首页与隐私界面
-│   ├── CaptureService.swift    # 录制与实时水印
-│   ├── EvidenceCrypto.swift    # .xagree 容器加解密
-│   ├── PeerSessionCoordinator.swift
-│   └── Localizable.xcstrings   # 中 / 英 / 日文案
-├── XAgreeTests/                # 单元测试
-├── XAgreeUITests/              # UI 测试
-├── docs/assets/                # README 产品视觉
-└── APP_PLAN.md                 # 产品与安全设计说明
-```
-
-## 当前状态
-
-项目处于本地开发与真机验证阶段，尚未作为正式 App Store 版本发布。发布前仍需要：
-
-- 两台真机的完整双机流程验证
-- 独立安全审查与隐私检查
-- 适用地区的法律审查
-- App Store 审核预评估
+暂时不方便赞赏也没关系。给仓库点一个 Star、分享项目，或提出一条真诚的建议，都是很珍贵的支持。
 
 ## 使用边界
 
 - 本 App 不验证参与者身份、年龄或表达内容的真实性。
-- 水印中的本地时间不是可信司法时间戳。
-- 记录不能证明同意持续存在，也不能限制任何人随后撤回同意。
-- iOS 闪存不提供可验证的安全擦除保证，因此项目不承诺“彻底物理删除”。
-- 如果任何一方不确定、不舒服、受到压力、无法清晰表达或已经撤回，请立即停止。
+- 设备本地时间不是可信司法时间戳。
+- 一份记录不能证明同意持续存在，也不能限制任何人随后撤回同意。
+- 本项目仅适用于已达到法定年龄、能够自由清晰表达意愿且用途合法的参与者。
 
 ---
 
 <p align="center">
   <img src="./docs/assets/app-icon.png" alt="同意爱 App 图标" width="88"><br>
-  <strong>把边界说清楚，把记录留在自己手里。</strong>
+  <strong>同意爱 XAgree</strong><br>
+  <sub>把话说清楚，让边界被看见。</sub>
 </p>

@@ -36,6 +36,13 @@ enum DraftStore {
         snapshot().drafts
     }
 
+    static func draft(matching url: URL) -> ExportDraft? {
+        let targetPath = url.standardizedFileURL.path
+        return snapshot().drafts.first {
+            draftURL(for: $0).standardizedFileURL.path == targetPath
+        }
+    }
+
     static func snapshot() -> Snapshot {
         var issues: [DraftStoreError] = []
         var drafts: [ExportDraft] = []

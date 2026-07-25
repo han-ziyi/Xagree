@@ -402,7 +402,7 @@ final class OnboardingUITests: XCTestCase {
         assertSystemSaveSheetPresents(exportStageHints: ["已加密", "重新打开保存器"])
         dismissSystemSaveSheet()
 
-        // 取消/关闭保存器后仍停留在导出页，可再次打开系统面板
+        // 取消/关闭保存器后仍停留在导出页，可再次打开系统面板。
         let reopen = app.buttons["重新打开保存器"]
         XCTAssertTrue(reopen.waitForExistence(timeout: 6), "export stage should remain after cancel")
         XCTAssertTrue(
@@ -411,7 +411,23 @@ final class OnboardingUITests: XCTestCase {
         )
         reopen.tap()
         assertSystemSaveSheetPresents(exportStageHints: ["已加密", "重新打开保存器"])
-        // 草稿索引持久化由 EvidenceCryptoTests.testPreserveExportDraftCopiesPackageIntoDraftsIndex 覆盖
+        dismissSystemSaveSheet()
+
+        // 第二次取消后选择稍后保存：应复用同一草稿并可靠返回首页。
+        waitTap("export.saveLater")
+        XCTAssertTrue(
+            element("home.root").waitForExistence(timeout: 6)
+                || app.navigationBars["我们的记录"].waitForExistence(timeout: 6),
+            "save later should return to home"
+        )
+
+        let drafts = scrollTo("home.drafts")
+        XCTAssertTrue(drafts.waitForExistence(timeout: 3), "saved draft should appear on home")
+        drafts.tap()
+
+        let reexportButtons = app.descendants(matching: .any).matching(identifier: "draft.reexport")
+        XCTAssertTrue(reexportButtons.firstMatch.waitForExistence(timeout: 4))
+        XCTAssertEqual(reexportButtons.count, 1, "repeated cancellation should not duplicate drafts")
     }
 
     /// 断言系统 UIDocumentPicker 保存面板出现（含时间戳默认文件名）。
@@ -463,6 +479,11 @@ final class OnboardingUITests: XCTestCase {
     }
 
     private func dismissSystemSaveSheet() {
+        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screenshot.name = "save-sheet-before-dismiss"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+
         for title in ["取消", "Cancel"] {
             let btn = app.buttons[title]
             if btn.waitForExistence(timeout: 1) {
@@ -484,23 +505,6 @@ final class OnboardingUITests: XCTestCase {
         // Last resort: swipe down on sheet
         if app.sheets.firstMatch.exists {
             app.sheets.firstMatch.swipeDown()
-        }
-    }
-
-    private func popToHomeFromExportIfNeeded() {
-        if element("home.root").waitForExistence(timeout: 1)
-            || app.navigationBars["我们的记录"].waitForExistence(timeout: 1) {
-            return
-        }
-        // Export hides back button; use interactive edge swipe
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.45))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.45))
-        start.press(forDuration: 0.05, thenDragTo: end)
-        if !(element("home.root").waitForExistence(timeout: 3)
-            || app.navigationBars["我们的记录"].waitForExistence(timeout: 1)) {
-            // Try nav bar back if any parent exposed it
-            let navBack = app.navigationBars.buttons.firstMatch
-            if navBack.exists { navBack.tap() }
         }
     }
 
