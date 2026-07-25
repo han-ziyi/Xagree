@@ -133,7 +133,7 @@ flowchart LR
 ### 実行
 
 ```bash
-git clone https://github.com/han-ziyi/agree.git
+git clone https://github.com/han-ziyi/Xagree.git
 cd agree
 open "性同意.xcodeproj"
 ```

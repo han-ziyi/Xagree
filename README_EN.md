@@ -133,7 +133,7 @@ The design and implementation still require independent review. Using modern cry
 ### Run
 
 ```bash
-git clone https://github.com/han-ziyi/agree.git
+git clone https://github.com/han-ziyi/Xagree.git
 cd agree
 open "性同意.xcodeproj"
 ```
