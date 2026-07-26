@@ -479,33 +479,53 @@ final class OnboardingUITests: XCTestCase {
     }
 
     private func dismissSystemSaveSheet() {
-        let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-        screenshot.name = "save-sheet-before-dismiss"
-        screenshot.lifetime = .keepAlways
-        add(screenshot)
-
         for title in ["取消", "Cancel"] {
             let btn = app.buttons[title]
             if btn.waitForExistence(timeout: 1) {
                 btn.tap()
+                XCTAssertTrue(waitForSystemSaveSheetToDismiss())
                 return
             }
         }
-        // iOS 26 document browser: back / close in nav bar
-        let back = app.navigationBars.buttons.firstMatch
-        if back.waitForExistence(timeout: 2) {
-            back.tap()
-            // May need a second tap if first only pops folder level
-            if app.buttons["保存"].waitForExistence(timeout: 1) || app.buttons["Save"].exists {
-                let back2 = app.navigationBars.buttons.firstMatch
-                if back2.exists { back2.tap() }
+
+        // iOS 26 的保存器会停在“我的 iPhone”等目录中。先点 Files 自己的
+        // “浏览/Browse”返回键；不能使用 navigationBars.buttons.firstMatch，
+        // 否则会命中被保存器遮住的 App 导航返回键。
+        for title in ["浏览", "Browse"] {
+            let back = app.buttons[title]
+            if back.waitForExistence(timeout: 1), back.isHittable {
+                back.tap()
+                break
             }
-            return
         }
-        // Last resort: swipe down on sheet
-        if app.sheets.firstMatch.exists {
-            app.sheets.firstMatch.swipeDown()
+
+        // 回到 Files 根页后才会出现可点击的取消按钮。
+        for title in ["取消", "Cancel"] {
+            let btn = app.buttons[title]
+            if btn.waitForExistence(timeout: 2), btn.isHittable {
+                btn.tap()
+                XCTAssertTrue(waitForSystemSaveSheetToDismiss())
+                return
+            }
         }
+
+        // 某些系统版本不把取消按钮暴露为 Button，最后用系统表单的下拉手势关闭。
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.10))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        XCTAssertTrue(waitForSystemSaveSheetToDismiss(), "system save sheet should dismiss")
+    }
+
+    private func waitForSystemSaveSheetToDismiss(timeout: TimeInterval = 5) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            let hasSaveButton = app.buttons["保存"].exists || app.buttons["Save"].exists
+            if !hasSaveButton, element("export.saveLater").isHittable {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.15))
+        }
+        return false
     }
 
     func testCompletionCanReturnHome() throws {
